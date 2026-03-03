@@ -81,3 +81,15 @@ We would like to also include dynamic analysis and AI-assisted analysis techniqu
 - Code to represent chosen vulnerabilities to test
 - Code to generate software-analysis structures (AST, control flow diagrams, etc) from vulnerable programs.
 -Input prompts for LLM-based APRs augmented with software-analysis structures
+
+# Division of Labor
+## Referencing our high level overview of the plan
+1. Decide on a specific subset of Common Weakness Enumerations to test (e.g. integer overflow, buffer overflow, etc). To ensure a rigorous evaluation, we will utilize established academic benchmark datasets, such as the NIST Juliet C/C++ Test Suite. **- Johnathan Tang**
+2. Decide which software-analysis based inputs we want to provide to the APR LLM (e.g. AST, control flow, data flow, PDG, CDG, more) **- Both**
+3. Find required tools to generate the structured data from the program analysis approaches (e.g. Joern). **- Jonathan Tang**
+4. Decide on a static APR LLM approach, such as using chain-of-thought prompt engineering but we swap out the different "Structure-Aware" inputs for testing. **- Andrew Stoltman**
+5. Test and analyze performance of different approaches from step 2 **- Both**
+6. (Optional) Test across older LLM models along with latest **- Andrew Stoltman**
+## For sections with “Both”
+2. The software analysis approaches can be split between both team members. Each member will research how to generate the structure data from the CWEs with existing tools (e.g. Joren).
+5. Metrics and visualizations provided through evaluation can be split upon team members.
