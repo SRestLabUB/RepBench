@@ -1,0 +1,18 @@
+{
+  "examples": [
+    {
+      "cwe_id": "CWE-190",
+      "cwe_name": "Integer Overflow",
+      "vulnerable": {
+        "source_code": "void bad() { char data = (char)RAND32(); char result = data + 1; }",
+        "cot_reasoning": "Step 1 - Identify Sink: Line 2 contains addition (data + 1). Step 2 - Trace Source: data from RAND32() cast to char. Step 3 - Check Validation: No bounds check. Step 4 - PDG Analysis: DDG shows direct flow. Step 5 - Vulnerability: char type can overflow.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() { char data = (char)RAND32(); if (data < CHAR_MAX) { char result = data + 1; } }",
+        "cot_reasoning": "Step 1 - Identify Sink: Line 3 contains addition. Step 2 - Trace Source: data from RAND32(). Step 3 - Check Validation: Line 2 has bounds check (data < CHAR_MAX). Step 4 - CFG Analysis: Control must pass validation. Step 5 - Safety: Overflow prevented.",
+        "label": "SAFE"
+      }
+    }
+  ]
+}
