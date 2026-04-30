@@ -55,8 +55,14 @@ class DOTConverter:
                     label_match = re.search(r'label\s*=\s*"([^"]*)"', edge_attrs)
                     if label_match:
                         lbl = label_match.group(1)
-                edge_type = 'DDG' if 'DDG' in lbl else 'AST'
-                clean_lbl = lbl.replace('DDG: ', '').strip() if lbl else ''
+                edge_type = 'AST'
+                if 'DDG' in lbl:
+                    edge_type = 'DDG'
+                elif 'CDG' in lbl:
+                    edge_type = 'CDG'
+                elif lbl:
+                    edge_type = 'CFG'
+                clean_lbl = lbl.replace('DDG: ', '').replace('CDG: ', '').strip() if lbl else ''
                 g['edges'].append({'source': s, 'target': t, 'type': edge_type, 'label': clean_lbl})
             graphs.append(g)
         return {'graphs': graphs}
@@ -80,7 +86,10 @@ class DOTConverter:
         lines.extend(['', '='*70])
         return '\n'.join(lines)
 
-def convert_file(path, fmt='text'):
+def convert_file(path, fmt='text', cwe_id='CWE-190', compress=False):
+    if compress:
+        from dot_compressor import compress_file
+        return compress_file(path, cwe_id=cwe_id)
     cvt = DOTConverter()
     with open(path) as f: dot = f.read()
     src = Path(path).stem
@@ -89,9 +98,14 @@ def convert_file(path, fmt='text'):
 
 if __name__ == '__main__':
     import sys
-    if len(sys.argv) < 2: print('Usage: python dot_converter.py <file> [--format text|json]'); sys.exit(1)
+    if len(sys.argv) < 2: print('Usage: python dot_converter.py <file> [--format text|json] [--compress] [--cwe CWE-190]'); sys.exit(1)
     fmt = 'text'
+    cwe_id = 'CWE-190'
+    compress = '--compress' in sys.argv
     if '--format' in sys.argv:
         i = sys.argv.index('--format')
         if i+1 < len(sys.argv): fmt = sys.argv[i+1]
-    print(convert_file(sys.argv[1], fmt))
+    if '--cwe' in sys.argv:
+        i = sys.argv.index('--cwe')
+        if i+1 < len(sys.argv): cwe_id = sys.argv[i+1]
+    print(convert_file(sys.argv[1], fmt, cwe_id=cwe_id, compress=compress))
