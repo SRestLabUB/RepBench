@@ -1,6 +1,6 @@
 FROM ubuntu:20.04
 
-WORKDIR /home/ubuntu
+WORKDIR /root
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -36,4 +36,4 @@ RUN cmake -S ./clang/ -B clang-build -DCMAKE_BUILD_TYPE=Release
 RUN make -C clang-build -j 16
 RUN make -C clang-build install
 
-WORKDIR ..
+ENV HECTOR_LIB=/root/epdg/llvm-project/llvm-build/lib
