@@ -61,7 +61,7 @@ for testcase in data:
     metadata['function_end'] = file_info[func_hash]['end_line']
     metadata['target'] = testcase['target']
     metadata['commit_id'] = testcase['commit_id']
-    label = 'fixed' if testcase['target'] == 0 else 'vulnerable'
+    label = 'cse713_fixed' if testcase['target'] == 0 else 'cse713_vulnerable'
 
     github_url = metadata['project_url'] + '.git'
     source_file = file_info[func_hash]['local_file_path']
