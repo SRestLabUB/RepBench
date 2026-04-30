@@ -99,7 +99,7 @@ for testcase in data:
             os.makedirs(repo_dir)
             source = project_dir + '/project_src/.'
             subprocess.run(['rsync', '-a', '-r', source, repo_dir])
-            if label == 'fixed':
+            if label == 'cse713_fixed':
                 subprocess.run(['git', '-C', repo_dir, 'checkout', '--quiet', metadata['commit_id']])
             else:
                 prev_commit = f"{metadata['commit_id']}~1"
