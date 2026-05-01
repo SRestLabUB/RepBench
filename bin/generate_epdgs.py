@@ -28,7 +28,7 @@ for root, dirs, files in os.walk(args.input):
         cwe_num = metadata['cwe'].split("-")[-1]
         filename = metadata['project_file_path'].split("/")[-1]
 
-        if not build_targets[metadata['project_name']] or not metadata['commit_id']:
+        if metadata['project_name'] not in build_targets or metadata['commit_id'] not in build_targets[metadata['project_name']]:
             continue
 
         build_target = build_targets[metadata['project_name']][metadata['commit_id']]
