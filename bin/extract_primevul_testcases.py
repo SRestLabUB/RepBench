@@ -55,6 +55,7 @@ for testcase in data:
     metadata['cve_desc'] = testcase['cve_desc']
     metadata['nvd_url'] = testcase['nvd_url']
     metadata['patch'] = testcase['commit_url']
+    metadata['project_name'] = name
     metadata['project_url'] = testcase['project_url']
     metadata['project_file_path'] = file_info[func_hash]['project_file_path']
     metadata['function_start'] = file_info[func_hash]['start_line']
