@@ -31,6 +31,7 @@ llm_prompts/
 workspace/
 test_prompts/
 tmp_prompt_*/
+primevul_data/
 
 # IDE configs
 opencode.json

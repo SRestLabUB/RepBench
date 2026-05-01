@@ -33,6 +33,11 @@ class LLMResponse:
     model_used: str
     success: bool
     error: Optional[str] = None
+    ttft_seconds: Optional[float] = None
+    total_seconds: Optional[float] = None
+    stream_chunks: int = 0
+    stream_idle_timeout_seconds: Optional[float] = None
+    streamed: bool = False
 
 
 class LLMClient:
@@ -49,7 +54,10 @@ class LLMClient:
         prompt: str,
         system_prompt: str = None,
         temperature: float = 0.2,
-        max_tokens: int = 2048
+        max_tokens: int = 2048,
+        stream: bool = True,
+        connect_timeout: float = 10,
+        stream_idle_timeout: Optional[float] = 60,
     ) -> LLMResponse:
         """Call LLM API with the given prompt"""
         
@@ -78,52 +86,140 @@ Respond with a JSON object in the exact format specified."""
             "max_tokens": max_tokens,
             "response_format": {"type": "json_object"}
         }
+        if stream:
+            payload["stream"] = True
         
         try:
+            started_at = time.monotonic()
             response = requests.post(
                 self.endpoint,
                 headers=headers,
                 json=payload,
-                timeout=120
+                stream=stream,
+                timeout=(connect_timeout, stream_idle_timeout)
             )
             response.raise_for_status()
-            
+
+            if stream:
+                content_parts = []
+                reasoning_parts = []
+                first_chunk_at = None
+                chunk_count = 0
+                for line in response.iter_lines(decode_unicode=True):
+                    if not line:
+                        continue
+                    chunk_count += 1
+                    if first_chunk_at is None:
+                        first_chunk_at = time.monotonic()
+
+                    if line.startswith("data:"):
+                        line = line[len("data:"):].strip()
+                    if line == "[DONE]":
+                        break
+
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = event.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta") or {}
+                    content = delta.get("content")
+                    if content:
+                        content_parts.append(content)
+                    reasoning_content = delta.get("reasoning_content") or delta.get("reasoning")
+                    if reasoning_content:
+                        reasoning_parts.append(str(reasoning_content))
+
+                total_seconds = time.monotonic() - started_at
+                ttft_seconds = first_chunk_at - started_at if first_chunk_at is not None else None
+                content = "".join(content_parts).strip()
+                if not content and reasoning_parts:
+                    content = "".join(reasoning_parts).strip()
+                return self._parse_content(
+                    content=content,
+                    ttft_seconds=ttft_seconds,
+                    total_seconds=total_seconds,
+                    stream_chunks=chunk_count,
+                    stream_idle_timeout=stream_idle_timeout,
+                    streamed=True,
+                )
+
             result = response.json()
             content = result["choices"][0]["message"]["content"]
-            
-            try:
-                parsed = json.loads(content)
-                return LLMResponse(
-                    conclusion=parsed.get("conclusion", "UNKNOWN"),
-                    confidence=parsed.get("confidence", 0.0),
-                    reasoning=parsed.get("reasoning", {}),
-                    explanation=parsed.get("explanation", ""),
-                    raw_response=content,
-                    model_used=self.model,
-                    success=True
-                )
-            except json.JSONDecodeError as e:
-                return LLMResponse(
-                    conclusion="UNKNOWN",
-                    confidence=0.0,
-                    reasoning={},
-                    explanation=content,
-                    raw_response=content,
-                    model_used=self.model,
-                    success=False,
-                    error=f"Failed to parse JSON: {str(e)}"
-                )
-                
+            total_seconds = time.monotonic() - started_at
+            return self._parse_content(
+                content=content,
+                ttft_seconds=None,
+                total_seconds=total_seconds,
+                stream_chunks=0,
+                stream_idle_timeout=stream_idle_timeout,
+                streamed=False,
+            )
+                 
         except requests.exceptions.RequestException as e:
+            total_seconds = time.monotonic() - started_at if 'started_at' in locals() else None
+            first_chunk_at = locals().get('first_chunk_at')
+            content_parts = locals().get('content_parts') or []
+            reasoning_parts = locals().get('reasoning_parts') or []
+            partial_content = "".join(content_parts).strip() or "".join(reasoning_parts).strip()
             return LLMResponse(
                 conclusion="UNKNOWN",
                 confidence=0.0,
                 reasoning={},
-                explanation="",
-                raw_response="",
+                explanation=partial_content,
+                raw_response=partial_content,
                 model_used=self.model,
                 success=False,
-                error=f"API request failed: {str(e)}"
+                error=f"API request failed: {str(e)}",
+                ttft_seconds=first_chunk_at - started_at if first_chunk_at is not None and 'started_at' in locals() else None,
+                total_seconds=total_seconds,
+                stream_chunks=locals().get('chunk_count', 0),
+                stream_idle_timeout_seconds=stream_idle_timeout,
+                streamed=stream,
+            )
+
+    def _parse_content(
+        self,
+        content: str,
+        ttft_seconds: Optional[float],
+        total_seconds: float,
+        stream_chunks: int,
+        stream_idle_timeout: Optional[float],
+        streamed: bool,
+    ) -> LLMResponse:
+        try:
+            parsed = json.loads(content)
+            return LLMResponse(
+                conclusion=parsed.get("conclusion", "UNKNOWN"),
+                confidence=parsed.get("confidence", 0.0),
+                reasoning=parsed.get("reasoning", {}),
+                explanation=parsed.get("explanation", ""),
+                raw_response=content,
+                model_used=self.model,
+                success=True,
+                ttft_seconds=ttft_seconds,
+                total_seconds=total_seconds,
+                stream_chunks=stream_chunks,
+                stream_idle_timeout_seconds=stream_idle_timeout,
+                streamed=streamed,
+            )
+        except json.JSONDecodeError as e:
+            return LLMResponse(
+                conclusion="UNKNOWN",
+                confidence=0.0,
+                reasoning={},
+                explanation=content,
+                raw_response=content,
+                model_used=self.model,
+                success=False,
+                error=f"Failed to parse JSON: {str(e)}",
+                ttft_seconds=ttft_seconds,
+                total_seconds=total_seconds,
+                stream_chunks=stream_chunks,
+                stream_idle_timeout_seconds=stream_idle_timeout,
+                streamed=streamed,
             )
     
     def test_connection(self) -> bool:
