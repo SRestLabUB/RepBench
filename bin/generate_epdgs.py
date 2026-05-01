@@ -27,7 +27,12 @@ for root, dirs, files in os.walk(args.input):
 
         cwe_num = metadata['cwe'].split("-")[-1]
         filename = metadata['project_file_path'].split("/")[-1]
-        build_target = build_targets[metadata['project_name']]
+
+        if not build_targets[metadata['project_name']] or not metadata['commit_id']:
+            continue
+
+        build_target = build_targets[metadata['project_name']][metadata['commit_id']]
+
         # Run `hector` to build ePDG with /project_src
         proj_path = '/home/ubuntu/' + root + '/project_src'
         subprocess.run(f"docker exec epdg_container bash -c '\
