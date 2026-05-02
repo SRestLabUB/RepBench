@@ -13,8 +13,16 @@ parser.add_argument('-s', '--start', help='Start line of vulnerable code lines')
 parser.add_argument('-e', '--end', help='End line of vulerable code lines')
 args = parser.parse_args()
 
-nodes = pd.read_json(args.nodes)
-links = pd.read_json(args.links)
+filtered_nodes = []
+with open(args.nodes, 'r') as f:
+    filtered_nodes = json.load(f)
+
+filtered_links = []
+with open(args.links, 'r') as f:
+    filtered_links = json.load(f)
+
+nodes = pd.DataFrame(filtered_nodes)
+links = pd.DataFrame(filtered_links)
 output = args.output
 
 merged = pd.merge(nodes, links, left_on='id', right_on='source_id', how='inner')
@@ -32,8 +40,8 @@ for df_name, df in grouped.items():
     try:
         binary = df_name.split(".")[-2]
         if args.start and args.end:
-            df.to_json(f'{output}/{binary}_function_only', orient='records', lines=True)
+            df.to_json(f'{output}/{binary}_function_only.jsonl', orient='records', lines=True)
         else:
-            df.to_json(f'{output}/{binary}', orient='records', lines=True)
+            df.to_json(f'{output}/{binary}.jsonl', orient='records', lines=True)
     except:
         continue
