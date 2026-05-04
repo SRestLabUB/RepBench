@@ -41,7 +41,7 @@ def main() -> None:
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--variant', default='pdg', choices=sorted(ALL_VARIANTS), help='Use pdg for graph-only ePDG')
     parser.add_argument('--max-prompt-chars', type=int, default=50000)
-    parser.add_argument('--max-edges', type=int, default=1200)
+    parser.add_argument('--max-edges', type=int, default=450)
     parser.add_argument('--model', default='qwen')
     parser.add_argument('--include-source', action='store_true', help='Include source code; use with pdg_plus_source for source+ePDG')
     parser.add_argument('--run-llm', action='store_true', help='Actually call the LLM; otherwise only writes prompt metadata')

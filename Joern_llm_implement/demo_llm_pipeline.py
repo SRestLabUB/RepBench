@@ -11,10 +11,10 @@ from dot_converter import convert_file
 from llm_prompt_generator import PromptGenerator
 from llm_client import LLMClient
 
-DOT_FILE = "/home/tangjiaoshou/CSE713/juliet_representations_real/CWE_190/ast/CWE190_Integer_Overflow__char_rand_add_01.ast.dot"
-CFG_FILE = "/home/tangjiaoshou/CSE713/juliet_representations_real/CWE_190/cfg/CWE190_Integer_Overflow__char_rand_add_01.cfg.dot"
-PDG_FILE = "/home/tangjiaoshou/CSE713/juliet_representations_real/CWE_190/pdg/CWE190_Integer_Overflow__char_rand_add_01.pdg.dot"
-SOURCE_FILE = "/home/tangjiaoshou/CSE713/juliet-test-suite-for-c-cplusplus-v1-3/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_add_01.c"
+DOT_FILE = "../juliet_representations_real/CWE_190/ast/CWE190_Integer_Overflow__char_rand_add_01.ast.dot"
+CFG_FILE = "../juliet_representations_real/CWE_190/cfg/CWE190_Integer_Overflow__char_rand_add_01.cfg.dot"
+PDG_FILE = "../juliet_representations_real/CWE_190/pdg/CWE190_Integer_Overflow__char_rand_add_01.pdg.dot"
+SOURCE_FILE = "../juliet-test-suite-for-c-cplusplus-v1-3/testcases/CWE190_Integer_Overflow/s01/CWE190_Integer_Overflow__char_rand_add_01.c"
 CWE_ID = "CWE-190"
 MODEL = "qwen"
 

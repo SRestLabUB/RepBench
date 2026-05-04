@@ -13,14 +13,12 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 # LLM API Configuration
-API_BASE_URL = "https://api.onkuku.com"
-API_KEY = "sk-CU6e8GtxN1HY0zXCQnwYm9ZEV4vNDiw6tOUEwwPCgGU8sbJf"
+API_BASE_URL = "https://dashscope-us.aliyuncs.com/compatible-mode/v1" # https://dashscope.aliyuncs.com/compatible-mode/v1 for Aliyun CN
+API_KEY = "YOUR_API_KEY_HERE"
 
 # Available models
 MODELS = {
-    "qwen": "qwen3.6-plus",
-    "kimi": "kimi-k2.5",
-    "glm": "glm-5",
+    "qwen": "qwen3.6-plus"
 }
 
 @dataclass
@@ -58,6 +56,7 @@ class LLMClient:
         stream: bool = True,
         connect_timeout: float = 10,
         stream_idle_timeout: Optional[float] = 60,
+        total_timeout: Optional[float] = 180,
     ) -> LLMResponse:
         """Call LLM API with the given prompt"""
         
@@ -91,12 +90,13 @@ Respond with a JSON object in the exact format specified."""
         
         try:
             started_at = time.monotonic()
+            read_timeout = total_timeout if total_timeout is not None else stream_idle_timeout
             response = requests.post(
                 self.endpoint,
                 headers=headers,
                 json=payload,
                 stream=stream,
-                timeout=(connect_timeout, stream_idle_timeout)
+                timeout=(connect_timeout, read_timeout)
             )
             response.raise_for_status()
 
@@ -106,6 +106,8 @@ Respond with a JSON object in the exact format specified."""
                 first_chunk_at = None
                 chunk_count = 0
                 for line in response.iter_lines(decode_unicode=True):
+                    if total_timeout is not None and (time.monotonic() - started_at) > total_timeout:
+                        break
                     if not line:
                         continue
                     chunk_count += 1

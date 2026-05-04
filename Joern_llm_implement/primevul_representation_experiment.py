@@ -110,6 +110,7 @@ class PrimeVulRepresentationExperiment:
         self.converter = DOTConverter()
         self.prompt_generator = PromptGenerator(max_prompt_chars=max_prompt_chars, dynamic_few_shot=True)
         self.client = LLMClient(model=model)
+        self.extraction_errors_path = self.output_dir / 'extraction_errors.jsonl'
 
     def discover_testcases(
         self,
@@ -211,16 +212,25 @@ class PrimeVulRepresentationExperiment:
                     continue
                 print(f'[{index}/{len(testcases)}] Extracting {scope}: {testcase.id}')
                 out_dir.mkdir(parents=True, exist_ok=True)
-                self._extract_one(server, testcase, scope, out_dir)
+                try:
+                    self._extract_one(server, testcase, scope, out_dir)
+                except Exception as exc:
+                    print(f'  ERROR extracting {testcase.id}: {exc}')
+                    jsonl_append(self.extraction_errors_path, {
+                        'testcase_id': testcase.id,
+                        'scope': scope,
+                        'timestamp': datetime.now().isoformat(),
+                        'error': str(exc),
+                    })
         finally:
             server.stop()
 
     def _extract_one(self, server: JoernServer, testcase: PrimeVulTestcase, scope: str, out_dir: Path) -> None:
         source_file = testcase.full_source_path.replace('"', '\\"')
-        result = server.query(f'importCode("{source_file}")')
+        result = server.query(f'importCode("{source_file}")', timeout=600)
         if not result['success'] and 'Cpg[' not in result['stdout']:
             raise RuntimeError(f'importCode failed for {testcase.id}: {result}')
-        server.query('run.ossdataflow')
+        server.query('run.ossdataflow', timeout=600)
 
         method_query = 'cpg.method'
         if scope == 'full_file_target_method':
@@ -231,7 +241,7 @@ class PrimeVulRepresentationExperiment:
 
         for rep_type, query_name in [('ast', 'dotAst'), ('cfg', 'dotCfg'), ('pdg', 'dotPdg')]:
             query = f'{method_query}.{query_name}.l'
-            result = server.query(query)
+            result = server.query(query, timeout=300)
             dot_text = result['stdout'] or ''
             if 'digraph' not in dot_text:
                 print(f'  WARNING: no {rep_type.upper()} digraph for {testcase.id}: {result.get("stderr", "")[:120]}')
@@ -279,6 +289,10 @@ class PrimeVulRepresentationExperiment:
             pdg_text=reps['pdg'],
         ).render(variant=variant)
 
+    def has_complete_graphs(self, testcase: PrimeVulTestcase, scope: str) -> bool:
+        rep_dir = self.representation_dir(testcase, scope)
+        return all((rep_dir / f'{rep}.dot').exists() for rep in ['ast', 'cfg', 'pdg'])
+
     def run(
         self,
         testcases: List[PrimeVulTestcase],
@@ -292,6 +306,9 @@ class PrimeVulRepresentationExperiment:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         for testcase in testcases:
+            if any(variant in GRAPH_VARIANTS for variant in variants) and not self.has_complete_graphs(testcase, scope):
+                print(f'Skipping testcase without complete graphs: {testcase.id}')
+                continue
             stats = self.graph_stats(testcase, scope)
             for variant in variants:
                 key = (testcase.id, variant, scope)
@@ -351,6 +368,7 @@ class PrimeVulRepresentationExperiment:
                         stream=self.stream_llm,
                         connect_timeout=self.connect_timeout,
                         stream_idle_timeout=self.stream_idle_timeout,
+                        total_timeout=180,
                     )
                     record.update({
                         'success': response.success,
@@ -509,12 +527,11 @@ def main() -> int:
                 if not (rep_dir / f'{rep}.dot').exists():
                     missing.append(str(rep_dir / f'{rep}.dot'))
     if missing:
-        print('Missing representation files. Re-run with --extract or check Joern failures:')
+        print('Missing representation files for some testcases; those testcases will be skipped during LLM phase:')
         for path in missing[:20]:
             print(f'  {path}')
         if len(missing) > 20:
             print(f'  ... {len(missing) - 20} more')
-        return 1
 
     results_path = experiment.run(
         testcases=testcases,
