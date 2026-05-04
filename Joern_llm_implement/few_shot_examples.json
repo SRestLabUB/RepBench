@@ -1,0 +1,88 @@
+{
+  "examples": [
+    {
+      "cwe_id": "CWE-121",
+      "cwe_name": "Stack-based Buffer Overflow",
+      "vulnerable": {
+        "source_code": "void bad() {\n    char src[100];\n    char dst[50];\n    memset(src, 'A', sizeof(src) - 1);\n    src[99] = '\\0';\n    memcpy(dst, src, strlen(src));\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: memcpy(dst, src, strlen(src)) writes into a stack buffer. Step 2 - Trace Source: src is a 100-byte stack array filled with up to 99 bytes; dst is a 50-byte stack array. Step 3 - Check Validation: there is no check that strlen(src) is less than sizeof(dst). Step 4 - CFG/PDG Analysis: data flows from the larger src buffer to memcpy and control reaches the copy without a guard. Step 5 - Vulnerability: copying up to 99 bytes into a 50-byte stack buffer can overwrite stack memory. Conclusion: VULNERABLE.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() {\n    char src[50];\n    char dst[100];\n    memset(src, 'A', sizeof(src) - 1);\n    src[49] = '\\0';\n    memcpy(dst, src, strlen(src) + 1);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: memcpy writes into stack buffer dst. Step 2 - Trace Source: src is a 50-byte stack array and dst is a 100-byte stack array. Step 3 - Check Validation: although there is no explicit bounds check, the destination capacity is larger than the maximum copied source length including the terminator. Step 4 - CFG/PDG Analysis: PDG shows src flows to memcpy, and declarations show dst has sufficient stack capacity. Step 5 - Safety: the copy size cannot exceed dst. Conclusion: SAFE.",
+        "label": "SAFE"
+      }
+    },
+    {
+      "cwe_id": "CWE-122",
+      "cwe_name": "Heap-based Buffer Overflow",
+      "vulnerable": {
+        "source_code": "void bad() {\n    char *src = (char *)malloc(100);\n    char *dst = (char *)malloc(50);\n    memset(src, 'A', 99);\n    src[99] = '\\0';\n    memcpy(dst, src, 100);\n    free(src);\n    free(dst);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: memcpy(dst, src, 100) writes 100 bytes to heap memory. Step 2 - Trace Source: dst is allocated with malloc(50), so only 50 bytes are available. Step 3 - Check Validation: there is no size check or reallocation before the 100-byte copy. Step 4 - CFG/PDG Analysis: PDG links the 50-byte allocation to the memcpy destination, and CFG has no guard between allocation and copy. Step 5 - Vulnerability: copying 100 bytes into a 50-byte heap allocation writes past the heap buffer. Conclusion: VULNERABLE.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() {\n    char *src = (char *)malloc(50);\n    char *dst = (char *)malloc(100);\n    memset(src, 'A', 49);\n    src[49] = '\\0';\n    memcpy(dst, src, 50);\n    free(src);\n    free(dst);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: memcpy(dst, src, 50) writes to heap buffer dst. Step 2 - Trace Source: dst is allocated with malloc(100), while the copy size is 50. Step 3 - Check Validation: the allocation size is directly sufficient for the requested copy. Step 4 - CFG/PDG Analysis: allocation of dst dominates the memcpy and the copied size is less than the allocated capacity. Step 5 - Safety: the heap destination has enough room. Conclusion: SAFE.",
+        "label": "SAFE"
+      }
+    },
+    {
+      "cwe_id": "CWE-190",
+      "cwe_name": "Integer Overflow",
+      "vulnerable": {
+        "source_code": "void bad() {\n    char data = (char)RAND32();\n    char result = data + 1;\n    printHexCharLine(result);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: data + 1 is an arithmetic addition that can overflow. Step 2 - Trace Source: data comes from RAND32() cast to char, so it may equal CHAR_MAX. Step 3 - Check Validation: there is no bounds check before the addition. Step 4 - CFG/PDG Analysis: DDG shows data flows directly from the random assignment to the addition, and CFG has no guarding branch. Step 5 - Vulnerability: if data is CHAR_MAX, adding 1 exceeds the char range. Conclusion: VULNERABLE.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() {\n    char data = (char)RAND32();\n    if (data < CHAR_MAX) {\n        char result = data + 1;\n        printHexCharLine(result);\n    }\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: data + 1 is the arithmetic sink. Step 2 - Trace Source: data is random and may be large. Step 3 - Check Validation: the branch data < CHAR_MAX validates the upper bound. Step 4 - CFG/PDG Analysis: the addition is control-dependent on the bounds check, so execution reaches the sink only when overflow is impossible. Step 5 - Safety: the guard prevents adding 1 to CHAR_MAX. Conclusion: SAFE.",
+        "label": "SAFE"
+      }
+    },
+    {
+      "cwe_id": "CWE-191",
+      "cwe_name": "Integer Underflow",
+      "vulnerable": {
+        "source_code": "void bad() {\n    char data = (char)RAND32();\n    char result = data - 1;\n    printHexCharLine(result);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: data - 1 is an arithmetic subtraction that can underflow. Step 2 - Trace Source: data comes from RAND32() cast to char, so it may equal CHAR_MIN. Step 3 - Check Validation: there is no lower-bound check before subtraction. Step 4 - CFG/PDG Analysis: DDG shows data flows from the random assignment to subtraction without a guarding condition. Step 5 - Vulnerability: if data is CHAR_MIN, subtracting 1 goes below the representable char range. Conclusion: VULNERABLE.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() {\n    char data = (char)RAND32();\n    if (data > CHAR_MIN) {\n        char result = data - 1;\n        printHexCharLine(result);\n    }\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: data - 1 is the subtraction sink. Step 2 - Trace Source: data is random and may be CHAR_MIN. Step 3 - Check Validation: data > CHAR_MIN checks the lower bound before subtraction. Step 4 - CFG/PDG Analysis: the subtraction is control-dependent on the validation branch. Step 5 - Safety: the operation executes only when data can be decremented safely. Conclusion: SAFE.",
+        "label": "SAFE"
+      }
+    },
+    {
+      "cwe_id": "CWE-415",
+      "cwe_name": "Double Free",
+      "vulnerable": {
+        "source_code": "void bad() {\n    char *data = (char *)malloc(100);\n    if (data == NULL) return;\n    free(data);\n    free(data);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: two free(data) calls operate on the same pointer. Step 2 - Trace Source: data is allocated once by malloc(100). Step 3 - Check Validation: the NULL check only validates allocation success; data is not set to NULL after the first free and is not reallocated. Step 4 - CFG/PDG Analysis: PDG carries the same data pointer into both free calls, and CFG executes the second free after the first. Step 5 - Vulnerability: freeing the same allocated object twice causes double free. Conclusion: VULNERABLE.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() {\n    char *data = (char *)malloc(100);\n    if (data == NULL) return;\n    free(data);\n    data = NULL;\n    free(data);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: free is called twice syntactically. Step 2 - Trace Source: data is allocated once, then freed. Step 3 - Check Validation: data is assigned NULL immediately after the first free. Step 4 - CFG/PDG Analysis: the second free receives NULL rather than the original freed allocation. Step 5 - Safety: free(NULL) is defined as a no-op in C, so the original allocation is not freed twice. Conclusion: SAFE.",
+        "label": "SAFE"
+      }
+    },
+    {
+      "cwe_id": "CWE-416",
+      "cwe_name": "Use After Free",
+      "vulnerable": {
+        "source_code": "void bad() {\n    char *data = (char *)malloc(100);\n    if (data == NULL) return;\n    free(data);\n    data[0] = 'A';\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: data[0] = 'A' accesses memory through a pointer. Step 2 - Trace Source: data points to heap memory allocated by malloc(100). Step 3 - Check Validation: free(data) occurs before the access, and there is no reallocation or validity check afterward. Step 4 - CFG/PDG Analysis: CFG order is malloc -> free -> data[0] write, and PDG shows the same pointer reaching the access. Step 5 - Vulnerability: writing through data after it has been freed is use after free. Conclusion: VULNERABLE.",
+        "label": "VULNERABLE"
+      },
+      "safe": {
+        "source_code": "void good() {\n    char *data = (char *)malloc(100);\n    if (data == NULL) return;\n    data[0] = 'A';\n    printHexCharLine(data[0]);\n    free(data);\n}",
+        "cot_reasoning": "Step 1 - Identify Sink: data[0] is a pointer dereference. Step 2 - Trace Source: data is allocated by malloc(100). Step 3 - Check Validation: the code checks data != NULL before dereference. Step 4 - CFG/PDG Analysis: all accesses occur before free(data), so the pointer still refers to live heap memory. Step 5 - Safety: memory is used only while allocated and freed afterward. Conclusion: SAFE.",
+        "label": "SAFE"
+      }
+    }
+  ]
+}

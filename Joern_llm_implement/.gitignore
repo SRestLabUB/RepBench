@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Temporary files
+temp_*.py
+temp_*.json
+debug*.py
+fix_*.py
+create_*.py
+validation_dry_run.json
+
+# Juliet specific
+analyze_juliet_cwe.py
+juliet_cwe_analysis.json
+IMPLEMENTATION_GUIDE.md
+MILESTONE3_PROGRESS.md
+PIPELINE_GUIDE.md
+
+# Data directories
+juliet-test-suite-for-c-cplusplus-v1-3/
+juliet_representations_real/
+juliet_representations/
+llm_prompts/
+workspace/
+test_prompts/
+tmp_prompt_*/
+primevul_data/
+
+# IDE configs
+opencode.json
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated outputs
+*.dot
+*.cpg
+*.json.tmp
+detection_result.json
+generated_prompt.txt
+*_dry_run.json
+
+# Environment
+.env
+*.log
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Compressed archives
+*.zip
+*.tar.gz
+
+# Test outputs
+validation_results_large.json
+batch_results*.json

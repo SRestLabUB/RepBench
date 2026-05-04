@@ -1,0 +1,41 @@
+{
+  "name": "latest auxiliary ePDG corpus used in paper",
+  "source_files": [
+    "/home/tangjiaoshou/CSE713/primevul_report_ready_results/merged_jsonl/final_extend_epdg_19.jsonl",
+    "/home/tangjiaoshou/CSE713/primevul_report_ready_results/merged_jsonl/final_extend_epdg_11.jsonl"
+  ],
+  "output_files": {
+    "epdg_19": "/home/tangjiaoshou/CSE713/primevul_paper_results_latest/epdg/epdg_19_results.jsonl",
+    "epdg_overlap_11": "/home/tangjiaoshou/CSE713/primevul_paper_results_latest/epdg/epdg_overlap_11_results.jsonl"
+  },
+  "overall_19": {
+    "attempted": 19,
+    "retained": 19,
+    "correct": 11,
+    "effective_accuracy": 0.5789473684210527,
+    "curated_accuracy": 0.5789473684210527,
+    "unknown": 0,
+    "avg_prompt_chars": 40289.26315789474,
+    "clipped_count": 2
+  },
+  "overlap_11": {
+    "attempted": 11,
+    "retained": 11,
+    "correct": 6,
+    "effective_accuracy": 0.5454545454545454,
+    "curated_accuracy": 0.5454545454545454,
+    "unknown": 0,
+    "avg_prompt_chars": 39508.0,
+    "clipped_count": 0
+  },
+  "cases_by_scope": {
+    "full_file": 6,
+    "function_only": 13
+  },
+  "cases_by_cwe": {
+    "CWE-122": 2,
+    "CWE-190": 9,
+    "CWE-415": 4,
+    "CWE-416": 4
+  }
+}

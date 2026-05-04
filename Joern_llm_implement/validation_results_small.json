@@ -1,0 +1,342 @@
+[
+  {
+    "cwe_id": "CWE-121",
+    "filename": "CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_01.c",
+    "prompt_chars": 11999,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 0.95,
+    "reasoning": {
+      "sink_identified": "Array index operation using 'data' as an index (e.g., buffer[data] = 1)",
+      "data_source": "Network input received via recv() into inputBuffer, subsequently parsed into the integer variable 'data'",
+      "validation_present": false,
+      "control_flow_analysis": "The execution flow from the socket read to the array index sink lacks any upper or lower bound validation for 'data'. The 'bad' variant explicitly omits the necessary range check, allowing out-of-bounds access.",
+      "pdg_dependencies": [
+        "DDG: recv() -> inputBuffer -> atoi() -> data",
+        "DDG: data -> stack array index sink",
+        "CDG: absence of conditional bounds check guarding the sink"
+      ]
+    },
+    "explanation": "The code reads untrusted data from a network socket, converts it to an integer 'data', and uses it directly as an index for a stack-allocated array without verifying that the value is within the array's valid bounds. This missing validation enables a stack-based buffer overflow when 'data' is negative or exceeds the array size.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-121",
+    "filename": "CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_02.c",
+    "prompt_chars": 11999,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 0.95,
+    "reasoning": {
+      "sink_identified": "Stack array assignment using `data` as an index (e.g., `buffer[data] = 1;`)",
+      "data_source": "Variable `data`, initialized to -1 (L48) and overwritten with parsed network input from `recv()` (L85)",
+      "validation_present": true,
+      "control_flow_analysis": "A bounds check is present but incomplete. As indicated by the test case description, the sink improperly checks the array index by not checking the upper bound (or lower bound). This allows values outside the valid array range to pass the conditional and trigger an out-of-bounds write.",
+      "pdg_dependencies": [
+        "L48: data = -1 (initialization)",
+        "L85: recv() populates inputBuffer, which is parsed into data",
+        "Array sink has direct data dependence on `data` and is guarded by an incomplete conditional check"
+      ]
+    },
+    "explanation": "The function reads an integer from a network socket into `data` and uses it to index a stack-allocated array. Although a validation check exists, it is incomplete (failing to verify both upper and lower bounds). Because `data` can be negative or exceed the array size, the flawed control flow permits an out-of-bounds memory write, resulting in a stack-based buffer overflow.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-121",
+    "filename": "CWE121_Stack_Based_Buffer_Overflow__CWE129_connect_socket_03.c",
+    "prompt_chars": 11999,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 0.95,
+    "reasoning": {
+      "sink_identified": "Array indexing operation on a stack-allocated buffer using `data` as the index",
+      "data_source": "Network input read via `recv()` into `inputBuffer`, subsequently parsed into the integer variable `data`",
+      "validation_present": false,
+      "control_flow_analysis": "The `if(5==5)` condition unconditionally directs execution to the vulnerable block. There is no bounds checking (e.g., `data < 10`) before the array access, allowing out-of-bounds writes.",
+      "pdg_dependencies": [
+        "DDG: recv() -> inputBuffer -> data -> array index sink",
+        "CDG: if(5==5) -> vulnerable array assignment"
+      ]
+    },
+    "explanation": "The code reads untrusted data from a socket, converts it to an integer, and uses it as an array index for a stack-allocated buffer without validating the upper bound. This missing check enables an attacker to trigger a stack-based buffer overflow by providing a sufficiently large index value.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-122",
+    "filename": "CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_01.c",
+    "prompt_chars": 12000,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "Line 42: memcpy(structCharVoid->charFirst, SRC_STR, sizeof(*structCharVoid))",
+      "data_source": "SRC_STR (source data) and sizeof(*structCharVoid) (incorrect length parameter)",
+      "validation_present": false,
+      "control_flow_analysis": "The memcpy operation executes unconditionally after successful memory allocation. There is no validation or bounds checking to ensure the copy length does not exceed the destination buffer size.",
+      "pdg_dependencies": [
+        "structCharVoid -> memcpy (destination buffer)",
+        "SRC_STR -> memcpy (source data)",
+        "sizeof(*structCharVoid) -> memcpy (copy length)"
+      ]
+    },
+    "explanation": "The memcpy call at line 42 uses sizeof(*structCharVoid) as the copy length, which represents the size of the entire struct (typically 24-32 bytes depending on architecture). However, the destination buffer structCharVoid->charFirst is only 16 bytes. This mismatch causes a heap-based buffer overflow, overwriting adjacent struct members (voidSecond and voidThird) and potentially corrupting heap metadata.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-122",
+    "filename": "CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_02.c",
+    "prompt_chars": 12000,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "Line 44: memcpy(structCharVoid->charFirst, SRC_STR, sizeof(*structCharVoid))",
+      "data_source": "SRC_STR (constant string) and sizeof(*structCharVoid) (incorrect size calculation)",
+      "validation_present": false,
+      "control_flow_analysis": "The vulnerable block executes unconditionally due to if(1). There are no bounds checks, length validations, or safe size calculations guarding the memcpy operation.",
+      "pdg_dependencies": [
+        "DDG: structCharVoid -> memcpy destination",
+        "DDG: SRC_STR -> memcpy source",
+        "DDG: sizeof(*structCharVoid) -> memcpy size argument"
+      ]
+    },
+    "explanation": "The memcpy call at line 44 copies sizeof(*structCharVoid) bytes (the size of the entire struct, typically 24 or 32 bytes depending on architecture) into structCharVoid->charFirst, which is only a 16-byte array allocated on the heap. This results in a heap-based buffer overflow that overwrites adjacent struct members (voidSecond and voidThird) and can corrupt heap management structures.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-122",
+    "filename": "CWE122_Heap_Based_Buffer_Overflow__char_type_overrun_memcpy_03.c",
+    "prompt_chars": 12000,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "Line 44: memcpy(structCharVoid->charFirst, SRC_STR, sizeof(*structCharVoid))",
+      "data_source": "SRC_STR constant string and sizeof(*structCharVoid) which evaluates to the full struct size (>=32 bytes)",
+      "validation_present": false,
+      "control_flow_analysis": "The flawed memcpy is inside an if(5==5) block that always executes, with no bounds checking or size validation before the copy operation.",
+      "pdg_dependencies": [
+        "memcpy destination depends on structCharVoid->charFirst (16-byte heap buffer)",
+        "memcpy source depends on SRC_STR (32-byte string literal)",
+        "memcpy size depends on sizeof(*structCharVoid) (full struct size, ~32+ bytes)"
+      ]
+    },
+    "explanation": "The memcpy call incorrectly uses sizeof(*structCharVoid) as the number of bytes to copy. Since structCharVoid contains charFirst[16] plus two pointers, the copy size exceeds the 16-byte destination buffer. This results in a heap-based buffer overflow that overwrites adjacent struct members (voidSecond and voidThird).",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-191",
+    "filename": "CWE191_Integer_Underflow__char_fscanf_multiply_01.c",
+    "prompt_chars": 11998,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 0.95,
+    "reasoning": {
+      "sink_identified": "line 31, multiplication operation `data * 2`",
+      "data_source": "line 27, `fscanf(stdin, \"%c\", &data)` reads unvalidated user input into `data`",
+      "validation_present": true,
+      "control_flow_analysis": "The `if(data < 0)` check only filters for negative values to avoid positive overflow, but it does not verify if `data` is small enough to cause an underflow when multiplied by 2. The sink is reachable with values where `data < CHAR_MIN / 2`, leading to an integer underflow.",
+      "pdg_dependencies": [
+        "30064771072 -> 30064771073 [DDG: data]",
+        "30064771077 -> 30064771076 [DDG: data]",
+        "30064771077 -> 30064771076 [DDG: 2]"
+      ]
+    },
+    "explanation": "The code reads a character from stdin into a signed char variable `data`. Although it checks `if(data < 0)` before multiplying by 2, this validation only prevents overflow for positive numbers. It fails to check if `data` is less than `CHAR_MIN / 2`, allowing sufficiently negative inputs to cause an integer underflow during multiplication.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-191",
+    "filename": "CWE191_Integer_Underflow__char_fscanf_multiply_02.c",
+    "prompt_chars": 11998,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 0.95,
+    "reasoning": {
+      "sink_identified": "line 36, multiplication operation `data * 2`",
+      "data_source": "line 29, `fscanf(stdin, \"%c\", &data)` reads user input into `data`",
+      "validation_present": false,
+      "control_flow_analysis": "The sink is executed when `data < 0`, but this condition only filters for negative values and does not verify that `data` is within a safe range for multiplication. There is no bounds check to ensure `data > CHAR_MIN / 2`, so sufficiently negative inputs will cause an underflow.",
+      "pdg_dependencies": [
+        "30064771073 -> 30064771075 [DDG: &data]",
+        "30064771075 -> 30064771077 [DDG: data]",
+        "30064771077 -> 30064771076 [DDG: data]"
+      ]
+    },
+    "explanation": "The code reads a character from standard input into a signed char `data`. It then checks if `data` is negative and multiplies it by 2. However, it lacks a validation check to ensure `data` is greater than `CHAR_MIN / 2`. If `data` is a sufficiently negative value, the multiplication `data * 2` will underflow the signed char range, resulting in undefined behavior or incorrect values.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-191",
+    "filename": "CWE191_Integer_Underflow__char_fscanf_multiply_03.c",
+    "prompt_chars": 11998,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 0.95,
+    "reasoning": {
+      "sink_identified": "line 36: char result = data * 2;",
+      "data_source": "line 29: fscanf(stdin, \"%c\", &data);",
+      "validation_present": false,
+      "control_flow_analysis": "The control flow always enters the multiplication block due to the constant true condition if(5==5). The check if(data < 0) only filters for negative values and does not verify a lower bound. Consequently, the sink is reachable for any negative input, and values less than or equal to CHAR_MIN/2 will cause an underflow.",
+      "pdg_dependencies": [
+        "30064771072 -> 30064771077 [DDG: data]",
+        "30064771077 -> 30064771079 [DDG: data]",
+        "30064771079 -> 30064771078 [DDG: data]"
+      ]
+    },
+    "explanation": "The code reads a signed char from stdin and multiplies it by 2. Although it checks if the value is negative, it lacks a lower bound check (data > CHAR_MIN/2). Multiplying a sufficiently negative char by 2 will wrap around, causing an integer underflow.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-415",
+    "filename": "CWE415_Double_Free__malloc_free_char_01.c",
+    "prompt_chars": 11999,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "free(data) at lines 32 and 34",
+      "data_source": "malloc(100*sizeof(char)) at line 29",
+      "validation_present": false,
+      "control_flow_analysis": "The control flow executes free(data) sequentially at lines 32 and 34 without any intervening pointer modification, nullification, or state check, guaranteeing a double free.",
+      "pdg_dependencies": [
+        "DDG: data flows from malloc (line 29) to free (line 32)",
+        "DDG: data flows from malloc (line 29) to free (line 34)"
+      ]
+    },
+    "explanation": "The function allocates memory for 'data' using malloc, then calls free(data) twice in immediate succession. Since the pointer is not set to NULL or reassigned between the two calls, the second free operates on already deallocated memory, constituting a classic double free vulnerability.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-415",
+    "filename": "CWE415_Double_Free__malloc_free_char_02.c",
+    "prompt_chars": 11999,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "free(data) at lines 34 and 39",
+      "data_source": "malloc(100*sizeof(char)) at line 31",
+      "validation_present": false,
+      "control_flow_analysis": "Both conditional blocks use if(1), guaranteeing sequential execution. The pointer 'data' is freed at line 34 but not set to NULL, allowing the second free at line 39 to operate on the same already-freed memory address.",
+      "pdg_dependencies": [
+        "DDG: data flows from malloc (L31) to first free (L34)",
+        "DDG: data flows from first free (L34) to second free (L39)"
+      ]
+    },
+    "explanation": "The code unconditionally frees the allocated memory twice. After the first free() call, the pointer is not nullified or checked, leading directly to a double free when the second free() is executed.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-415",
+    "filename": "CWE415_Double_Free__malloc_free_char_03.c",
+    "prompt_chars": 11999,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "line 39: free(data)",
+      "data_source": "line 31: malloc(100*sizeof(char))",
+      "validation_present": false,
+      "control_flow_analysis": "Both if(5==5) conditions are always true, causing the execution flow to unconditionally pass through two free() calls on the same pointer without any intervening nullification or reallocation.",
+      "pdg_dependencies": [
+        "30064771079 -> 30064771084 [DDG: data]",
+        "30064771082 -> 30064771084 [DDG: data]"
+      ]
+    },
+    "explanation": "The function allocates memory at line 31, frees it at line 34, and then frees the exact same pointer again at line 39. Because both conditional statements evaluate to true, the double free occurs unconditionally, leading to undefined behavior and potential exploitation.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-416",
+    "filename": "CWE416_Use_After_Free__malloc_free_char_01.c",
+    "prompt_chars": 11998,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "line 36: printLine(data)",
+      "data_source": "line 29: malloc(100*sizeof(char))",
+      "validation_present": false,
+      "control_flow_analysis": "Execution flows sequentially from allocation to initialization, then to free(data) at line 34, and immediately to printLine(data) at line 36. There is no intervening validation, null check, or pointer reassignment after deallocation.",
+      "pdg_dependencies": [
+        "DDG: data flows from malloc (L29) to free (L34)",
+        "DDG: data flows from malloc (L29) to printLine (L36)"
+      ]
+    },
+    "explanation": "The function allocates a character buffer, explicitly frees it at line 34, and then passes the dangling pointer to printLine at line 36. This results in a direct use-after-free vulnerability as the memory is accessed after it has been deallocated.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-416",
+    "filename": "CWE416_Use_After_Free__malloc_free_char_02.c",
+    "prompt_chars": 11998,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "Line 41: printLine(data)",
+      "data_source": "Line 31: malloc(100*sizeof(char))",
+      "validation_present": false,
+      "control_flow_analysis": "The code contains two unconditional if(1) blocks. The first block allocates and frees 'data'. The second block uses 'data' in printLine() without any null check, reallocation, or pointer state validation, guaranteeing execution of the use-after-free.",
+      "pdg_dependencies": [
+        "30064771072 -> 30064771087 [DDG: data]",
+        "30064771086 -> 30064771087 [DDG: data]"
+      ]
+    },
+    "explanation": "The pointer 'data' is allocated via malloc, freed, and subsequently passed to printLine() without being reset to NULL or reallocated. Because both conditional blocks evaluate to true, the use-after-free vulnerability is triggered unconditionally.",
+    "error": null
+  },
+  {
+    "cwe_id": "CWE-416",
+    "filename": "CWE416_Use_After_Free__malloc_free_char_03.c",
+    "prompt_chars": 11998,
+    "expected_contains_issue": true,
+    "success": true,
+    "model": "qwen3.6-plus",
+    "conclusion": "VULNERABLE",
+    "confidence": 1.0,
+    "reasoning": {
+      "sink_identified": "line 41: printLine(data)",
+      "data_source": "line 31: malloc(100*sizeof(char))",
+      "validation_present": false,
+      "control_flow_analysis": "The first if(5==5) block unconditionally executes, freeing 'data' at line 36. The second if(5==5) block unconditionally executes, passing the freed pointer to printLine() at line 41. There is no validation, null check, or reallocation between the free and the use.",
+      "pdg_dependencies": [
+        "30064771074 -> 30064771079 [DDG: data]",
+        "30064771082 -> 30064771087 [DDG: data]",
+        "30064771072 -> 30064771089 [DDG: data]",
+        "30064771087 -> 30064771089 [DDG: data]"
+      ]
+    },
+    "explanation": "The pointer 'data' is allocated and then freed inside an unconditionally true if-block. It is subsequently used in printLine() inside another unconditionally true if-block without being reallocated or set to NULL, constituting a clear use-after-free vulnerability.",
+    "error": null
+  }
+]

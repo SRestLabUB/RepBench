@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""
+Joern 4.0 HTTP API client for exporting AST, CFG, PDG
+Uses Joern's built-in HTTP server for reliable script execution
+"""
+
+import subprocess
+import requests
+import json
+import time
+import os
+import re
+import argparse
+from pathlib import Path
+
+JULIET_BASE = '/home/tangjiaoshou/CSE713/juliet-test-suite-for-c-cplusplus-v1-3'
+OUTPUT_BASE = '/home/tangjiaoshou/CSE713/juliet_representations_real'
+
+CWE_DIR_MAP = {
+    'CWE-121': 'CWE121_Stack_Based_Buffer_Overflow',
+    'CWE-122': 'CWE122_Heap_Based_Buffer_Overflow',
+    'CWE-190': 'CWE190_Integer_Overflow',
+    'CWE-191': 'CWE191_Integer_Underflow',
+    'CWE-415': 'CWE415_Double_Free',
+    'CWE-416': 'CWE416_Use_After_Free',
+}
+
+JOERN_SERVER_URL = 'http://localhost:8080'
+
+
+class JoernServer:
+    """Manage Joern HTTP server process"""
+    
+    def __init__(self):
+        self.process = None
+        self.url = JOERN_SERVER_URL
+    
+    def start(self):
+        """Start Joern server in background"""
+        print("Starting Joern server...")
+        self.process = subprocess.Popen(
+            ['joern', '--server'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Wait for server to be ready
+        max_wait = 30
+        for i in range(max_wait):
+            try:
+                response = requests.get(f'{self.url}/query-sync', timeout=1)
+                print(f"✅ Joern server ready (took {i+1}s)")
+                return True
+            except:
+                time.sleep(1)
+        
+        print(f"❌ Joern server not ready after {max_wait}s")
+        return False
+    
+    def stop(self):
+        """Stop Joern server"""
+        if self.process:
+            self.process.terminate()
+            self.process.wait(timeout=5)
+            print("Joern server stopped")
+    
+    def query(self, query: str) -> dict:
+        """Execute a query on Joern server"""
+        try:
+            response = requests.post(
+                f'{self.url}/query-sync',
+                json={'query': query},
+                timeout=120
+            )
+            result = response.json()
+            return {
+                'success': result.get('success', False),
+                'stdout': result.get('stdout', ''),
+                'stderr': result.get('stderr', '')
+            }
+        except Exception as e:
+            return {'success': False, 'stdout': '', 'stderr': str(e)}
+
+
+def find_source_file(cwe_id: str, filename: str) -> str | None:
+    """Find source file in Juliet directory structure"""
+    cwe_dir = CWE_DIR_MAP.get(cwe_id, cwe_id.replace('-', ''))
+    root_path = os.path.join(JULIET_BASE, 'testcases', cwe_dir, filename)
+    if os.path.exists(root_path):
+        return root_path
+    for subdir in ['s01', 's02', 's03', 's04', 's05', 's06', 's07']:
+        path = os.path.join(JULIET_BASE, 'testcases', cwe_dir, subdir, filename)
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def list_source_files(cwe_id: str, limit: int | None = None) -> list[Path]:
+    """List Juliet C files for a CWE, handling both flat and sXX layouts."""
+    cwe_dir = CWE_DIR_MAP.get(cwe_id, cwe_id.replace('-', ''))
+    cwe_path = Path(JULIET_BASE) / 'testcases' / cwe_dir
+    if not cwe_path.exists():
+        return []
+
+    files = []
+    for source_file in sorted(cwe_path.rglob('*.c')):
+        # Juliet helper files do not represent standalone test cases.
+        if source_file.name.startswith('main'):
+            continue
+        files.append(source_file)
+        if limit and len(files) >= limit:
+            break
+    return files
+
+
+def process_file_with_server(cwe_id: str, filename: str, server: JoernServer) -> bool:
+    """Process a single file using an existing Joern HTTP server."""
+    print(f"\n{'='*70}")
+    print(f"PROCESSING: {filename}")
+    print(f"CWE: {cwe_id}")
+    print(f"{'='*70}")
+    
+    # Find source file
+    source_file = find_source_file(cwe_id, filename)
+    if not source_file:
+        print(f"❌ Source file not found: {filename}")
+        return False
+    
+    print(f"✅ Source: {source_file}")
+    
+    # Setup output directory
+    output_dir = os.path.join(OUTPUT_BASE, cwe_id.replace('-', '_'))
+    for subdir in ['ast', 'cfg', 'pdg', 'serialized']:
+        os.makedirs(os.path.join(output_dir, subdir), exist_ok=True)
+    
+    # Step 1: Import code and generate CPG
+    print("\n📊 Generating CPG...")
+    result = server.query(f'importCode("{source_file}")')
+    if 'Cpg[' in result['stdout']:
+        print("✅ CPG generated")
+    else:
+        print(f"⚠️ CPG generation response: {result['stdout'][:200]}")
+
+    # Run data flow analysis
+    print("Running data flow analysis...")
+    result = server.query('run.ossdataflow')
+    print(f"  {result['stdout'][:200] if result['stdout'] else 'OK'}")
+
+    exported_files = []
+    for rep_type, query_name in [('ast', 'dotAst'), ('cfg', 'dotCfg'), ('pdg', 'dotPdg')]:
+        print(f"\n📤 Exporting {rep_type.upper()}...")
+        result = server.query(f'cpg.method.{query_name}.l')
+        rep_dir = os.path.join(output_dir, rep_type)
+        os.makedirs(rep_dir, exist_ok=True)
+
+        if result['stdout']:
+            lines = result['stdout'].strip()
+            if 'digraph' in lines:
+                rep_file = os.path.join(rep_dir, f'{Path(filename).stem}.{rep_type}.dot')
+                with open(rep_file, 'w') as f:
+                    f.write(lines)
+                exported_files.append(rep_file)
+                print(f"✅ {rep_type.upper()} exported: {rep_file}")
+            else:
+                print(f"⚠️ No {rep_type.upper()} dot found")
+        else:
+            print(f"❌ {rep_type.upper()} export failed: {result.get('stderr', 'No output')[:200]}")
+
+    print(f"\n{'='*70}")
+    print("PROCESSING COMPLETE")
+    print(f"Source:  {source_file}")
+    print(f"Output:  {output_dir}")
+    print(f"Exported: {len(exported_files)} files")
+    print(f"{'='*70}")
+
+    return len(exported_files) > 0
+
+
+def process_file(cwe_id: str, filename: str) -> bool:
+    """Process a single file using Joern HTTP server."""
+    server = JoernServer()
+    if not server.start():
+        return False
+    try:
+        return process_file_with_server(cwe_id, filename, server)
+    finally:
+        server.stop()
+
+
+def process_cwe(cwe_id: str, limit: int | None = None) -> tuple[int, int]:
+    """Process multiple files for a CWE while reusing one Joern server."""
+    source_files = list_source_files(cwe_id, limit)
+    if not source_files:
+        print(f"No source files found for {cwe_id}")
+        return 0, 0
+
+    print(f"Found {len(source_files)} source files for {cwe_id}")
+    server = JoernServer()
+    if not server.start():
+        return 0, len(source_files)
+
+    success_count = 0
+    try:
+        for index, source_file in enumerate(source_files, 1):
+            print(f"\n[{index}/{len(source_files)}] {source_file.name}")
+            if process_file_with_server(cwe_id, source_file.name, server):
+                success_count += 1
+    finally:
+        server.stop()
+
+    print(f"\nBatch complete for {cwe_id}: {success_count}/{len(source_files)} succeeded")
+    return success_count, len(source_files)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Joern 4.0 HTTP API pipeline')
+    parser.add_argument('--cwe', default='CWE-190', choices=list(CWE_DIR_MAP.keys()))
+    parser.add_argument('--file', default='CWE190_Integer_Overflow__char_rand_add_01.c')
+    parser.add_argument('--batch', action='store_true', help='Process multiple source files for the CWE')
+    parser.add_argument('--limit', type=int, help='Limit number of files in batch mode')
+    
+    args = parser.parse_args()
+    
+    if args.batch:
+        success_count, total = process_cwe(args.cwe, args.limit)
+        return 0 if total > 0 and success_count == total else 1
+
+    success = process_file(args.cwe, args.file)
+    return 0 if success else 1
+
+
+if __name__ == '__main__':
+    exit(main())
