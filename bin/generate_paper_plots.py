@@ -9,6 +9,7 @@ from matplotlib.ticker import PercentFormatter
 import json
 import sys
 import argparse
+from adjustText import adjust_text
 
 def data_grouped_by(data, group_by):
     ret = []
@@ -94,6 +95,8 @@ def curated_vs_avgpromptchars(results):
 
     fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
 
+    texts = []
+
     for label, vals in data.items():
         s = STYLE[label]
         ax.scatter(
@@ -108,6 +111,16 @@ def curated_vs_avgpromptchars(results):
             alpha=0.9,
             zorder=3,
         )
+
+        # Label each point; text is tinted with the category color so the
+        # grouping reads even with the labels present.
+        for name, x, y in zip(vals["names"], vals["avg_prompt_chars"], vals["accuracy"]):
+            texts.append(ax.text(x, y, name))
+
+    adjust_text(
+        texts,
+        expand=(1.5,1.3)
+    )
 
     ax.set_xlabel("Average Prompt Characters")
     ax.set_ylabel("Curated Accuracy")
@@ -160,6 +173,8 @@ def curated_vs_cwe(results):
     cats = [cats[i] for i in order]
     accs = [accs[i] for i in order]
 
+    print(cats)
+    print(accs)
     headroom = min(100.0, max(accs) * 1.15)
 
     fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
