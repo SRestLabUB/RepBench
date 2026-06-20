@@ -10,7 +10,7 @@ This project implements an automated vulnerability detection pipeline:
 - **Conservative Compression**: Reduce prompt size while preserving evidence
 - **Dynamic Few-Shot**: Select examples based on prompt budget
 - **Chain-of-Thought**: 5-step reasoning process for LLM
-- **API Disguise**: Headers and delays to avoid detection
+- **LLM API Client**: Environment-configured OpenAI-compatible endpoint
 
 ## Supported CWEs
 
@@ -81,9 +81,22 @@ Initial shapelib CWE-415 comparison result:
 
 ### 1. Install Dependencies
 
-pip install requests
+```bash
+python -m pip install -r requirements.txt
+```
 
-### 2. Install Joern
+### 2. Configure Runtime Settings
+
+Normally, do **not** set `CSE713_ROOT`. `project_paths.py` automatically finds the checkout directory by locating a parent containing both `README.md` and `Joern_llm_implement/`. Application scripts import paths from it; users do not run it directly:
+
+```python
+from project_paths import PROJECT_ROOT
+output_dir = PROJECT_ROOT / "outputs"
+```
+
+For online runs, set `LLM_API_KEY` and `LLM_API_BASE_URL` (including `/v1`) in the environment. In PowerShell, set the same variables through the environment-variable syntax. Optional overrides are `CSE713_ROOT`, `CSE713_JULIET_BASE`, `CSE713_REPRESENTATIONS_BASE`, and `JOERN_JAVA_HOME`; set them only when automatic discovery does not apply.
+
+### 3. Install Joern
 find the joern-install.sh file in the repo
 
 ```
@@ -94,17 +107,40 @@ joern
 
 by doing so, you can see the version of the Joern, type "exit" to exit
 
-### 3. Run Demo
+### 4. Run Demo
 
-python3 demo_llm_pipeline.py
+```bash
+python3 demo_llm_pipeline.py --dry-run  # no API call
+python3 demo_llm_pipeline.py            # online run
+```
 
-### 4. Run Batch Validation
+### 5. Run Batch Validation
 
+```bash
 python3 validate_llm_samples.py --limit 3 --model qwen
+```
+
+## Standard Pipeline
+
+1. Generate AST, CFG, and PDG with `joern_http_client.py`.
+2. Convert or compress DOT graphs with `dot_converter.py` and `dot_compressor.py`.
+3. Build a budget-aware prompt with source, graph evidence, and selected few-shot examples.
+4. Use `demo_llm_pipeline.py --dry-run` to inspect the prompt, or run without `--dry-run` to call the configured LLM.
+5. Use `validate_llm_samples.py` for batch evaluation.
+
+Typical representation commands:
+
+```bash
+python3 joern_http_client.py --cwe CWE-190 --file test_case_01.c
+python3 joern_http_client.py --cwe CWE-190 --batch --limit 10
+python3 dot_converter.py file.pdg.dot --format text
+```
 
 ## Project Structure
 
-CSE713/
+```text
+Joern_llm_implement/
+├── project_paths.py          # portable repository and data paths
 ├── llm_client.py              # LLM API client
 ├── llm_prompt_generator.py    # CoT prompt generator
 ├── vulnerability_detector.py  # End-to-end detector
@@ -118,8 +154,8 @@ CSE713/
 │
 ├── README.md                  # This file
 ├── SETUP_FOR_OTHER_DATASET.md # Guide for other datasets
-├── COMPLETE_PIPELINE_GUIDE.md # Detailed pipeline guide
-└── GITHUB_PUSH_GUIDE.md       # Push instructions
+└── requirements.txt           # Python dependencies
+```
 
 ## Key Features
 
@@ -143,13 +179,13 @@ CSE713/
 
 ## Validation Results
 
-Tested on 15 Juliet samples (3 per CWE):
+Tested on 15 Juliet samples (3 for each of five validation CWEs):
 - **Success Rate**: 100% (15/15)
-- **Model**: qwen3.5-plus
+- **Model**: qwen3.6-plus
 - **Confidence**: 0.95-1.0
 - **Prompt Size**: ~12k chars
 
 ## Documentation
 
-- SETUP_FOR_OTHER_DATASET.md - Guide for other datasets
-- COMPLETE_PIPELINE_GUIDE.md - Full pipeline walkthrough
+- `README.md` (this file): installation, runtime configuration, and the standard pipeline
+- `SETUP_FOR_OTHER_DATASET.md`: adapting the pipeline to a different dataset

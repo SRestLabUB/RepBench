@@ -21,7 +21,10 @@ from llm_client import LLMClient
 from llm_prompt_generator import ALL_VARIANTS, PromptGenerator
 
 
-ROOT = Path('/home/tangjiaoshou/CSE713')
+from project_paths import PROJECT_ROOT
+
+
+ROOT = PROJECT_ROOT
 DEFAULT_TESTCASE_ROOT = ROOT / 'primevul_testcases_output_clean'
 DEFAULT_OUTPUT_DIR = ROOT / 'primevul_representation_pilot'
 SUPPORTED_CWES = {'CWE-122', 'CWE-190', 'CWE-191', 'CWE-415', 'CWE-416'}

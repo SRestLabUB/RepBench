@@ -10,14 +10,14 @@ This document is intended for researchers who want to apply this project to othe
 
 ### 1. Python Environment
 
-Requirement: Python 3.9+ (Python 3.11 recommended)
+Requirement: Python 3.10+ (Python 3.11 recommended)
 
 ```bash
 # Check the Python version
 python3 --version
 
-# Install the only dependency
-pip install requests
+# Install Python dependencies
+python -m pip install -r requirements.txt
 ```
 
 ### 2. Joern Installation
@@ -34,37 +34,14 @@ After that, you should be able to see the Joern version. Type "exit" to leave th
 
 ### 3. LLM API Configuration
 
-**API Settings** (llm_client.py):
+Do not edit credentials into `llm_client.py`. Configure an OpenAI-compatible provider through environment variables:
 
-```python
-API_BASE_URL = "https://api.onkuku.com"
-API_KEY = "sk-..."
-
-MODELS = {
-    'qwen': 'qwen3.6-plus',    # Default, balanced
-    'kimi': 'kimi-k2.5',
-    'glm': 'glm-5',            # Alternative
-}
-
-response_format = {"type": "json_object"}  # Force JSON output
-temperature = 0.2  # Default, adjustable from 0.0 to 0.5
+```bash
+export LLM_API_KEY="your-key"
+export LLM_API_BASE_URL="https://provider.example/v1"
 ```
 
-**API Disguise Headers** (llm_client.py):
-
-```python
-headers = {
-    'Authorization': f'Bearer {api_key}',
-    'Content-Type': 'application/json',
-    'User-Agent': 'vscode-code-extension/1.92.0',      # Avoid detection
-    'X-Request-Id': str(uuid.uuid4()),                  # Random ID
-    'X-Vscode-Editorid': 'vscode-desktop',              # VS Code identity
-}
-```
-
-**Random Delay**: 0.3-0.8 seconds between API calls (avoid rate limiting)
-
-**Why Disguise?**: Some API providers limit automated calls. These headers + delay simulate legitimate VS Code extension traffic.
+The default model alias is `qwen` (`qwen3.6-plus`). A provider model identifier can also be passed with `--model`. See `README.md` for PowerShell syntax and optional runtime settings.
 
 ---
 
@@ -84,16 +61,16 @@ your_dataset/
 +-- representations/
 ```
 
-### 2. Update Path Configuration
+### 2. Configure Dataset Paths
 
-Edit joern_http_client.py (lines 12-13):
+Do not edit absolute paths in Python files. Point the pipeline at an external Juliet-style dataset and representation directory with:
 
-```python
-JULIET_BASE = "/path/to/your/dataset/testcases"
-OUTPUT_BASE = "/path/to/your/dataset/representations"
+```bash
+export CSE713_JULIET_BASE="/path/to/your/juliet-suite"
+export CSE713_REPRESENTATIONS_BASE="/path/to/your/representations"
 ```
 
-Make the same update in vulnerability_detector.py (lines 19-20).
+`CSE713_ROOT` is normally unnecessary; it is only a fallback when automatic repository discovery cannot see `README.md` and `Joern_llm_implement/`.
 
 ### 3. CWE Type Mapping
 
@@ -305,20 +282,19 @@ python3 validate_llm_samples.py --max-prompt-chars 18000
 ### 2. Model Selection
 
 ```bash
-python3 validate_llm_samples.py --model qwen   # Default
-python3 validate_llm_samples.py --model kimi   # Best for coding
-python3 validate_llm_samples.py --model glm    # Alternative
+python3 validate_llm_samples.py --model qwen
+python3 validate_llm_samples.py --model <provider-model-id>
 ```
 
 ### 3. Temperature Adjustment
 
-Edit llm_client.py (line 52):
+Pass a consistent value to `LLMClient.call` when writing a custom runner:
 
 ```python
 temperature: float = 0.2  # Default 0.2, range 0.0-0.5
 ```
 
-**Why 0.2**: Balances determinism with enough variation to avoid detection patterns.
+**Why 0.2**: It provides mostly repeatable results while retaining limited sampling variation.
 
 ---
 
@@ -372,18 +348,13 @@ python3 validate_llm_samples.py --max-prompt-chars 8000
 Step 1: Prepare the environment
 
 ```bash
-pip install requests
+python -m pip install -r requirements.txt
 export PATH=$HOME/joern:$PATH
 export LLM_API_KEY="your-key"
+export LLM_API_BASE_URL="https://provider.example/v1"
 ```
 
-Step 2: Update the configuration
-
-Edit these files:
-- joern_http_client.py (lines 12-13, 15-22)
-- vulnerability_detector.py (lines 19-20, 22-29)
-- llm_prompt_generator.py (lines 22-28)
-- dot_compressor.py (lines 18-24, keep in sync)
+Step 2: Configure paths with `CSE713_JULIET_BASE` and `CSE713_REPRESENTATIONS_BASE`. Only edit the CWE mappings and prompt/compression hints when adding a new CWE category.
 
 Step 3: Create few-shot examples for CWE-XXX
 
@@ -429,13 +400,13 @@ In theory yes (Java, Python), but ensure Joern supports the language.
 
 Yes. Add CWE_DIR_MAP mapping, CWE_SINK_HINTS entry, and few-shot examples.
 
-### Q4: Why use API disguise?
+### Q4: Why are compatibility headers and a short delay used?
 
-Some API providers limit automated calls. Disguise via User-Agent, X-Request-Id, random delays.
+They provide request tracing and reduce accidental rate-limit bursts. They do not bypass provider authentication or usage policies.
 
 ### Q5: Why is temperature 0.2?
 
-0.0-0.1 is too deterministic (may trigger detection). 0.3-0.5 is too random (may produce invalid JSON).
+A low value improves repeatability while retaining limited sampling variation. Use the same value across variants for a controlled comparison.
 
 ### Q6: What is response_format?
 
@@ -447,35 +418,28 @@ Forces LLM to output JSON: response_format = {"type": "json_object"}
 
 | File | Main Function | When to Modify |
 |------|---------------|----------------|
-| llm_client.py | LLM API calls | API key, URL, model, temperature |
+| llm_client.py | LLM API calls | Model or request behavior; use environment variables for credentials/URL |
 | llm_prompt_generator.py | Prompt generation | Sink hints, CoT process |
-| vulnerability_detector.py | Pipeline entry | Paths, CWE mapping, budget |
+| vulnerability_detector.py | Pipeline entry | CWE mapping and budget; use environment variables for paths |
 | dot_converter.py | DOT parsing | Usually not modified |
 | dot_compressor.py | DOT compression | Sink hints synchronization |
-| joern_http_client.py | Joern client | Paths, CWE mapping |
+| joern_http_client.py | Joern client | CWE mapping and server behavior; use environment variables for paths |
 | few_shot_examples.json | Few-shot data | Add new CWE examples |
 | validation_results_small.json | Reference results | Review expected output |
 
 ---
 
-## Appendix B: Key Code Locations
+## Appendix B: Configuration Locations
 
-| Configuration Item | File | Line |
-|-------------------|------|------|
-| API Base URL | llm_client.py | 16 |
-| API Key | llm_client.py | 17 |
-| Model list | llm_client.py | 20-25 |
-| Temperature | llm_client.py | 52 |
-| Response format | llm_client.py | 54 |
-| Disguise headers | llm_client.py | 35-40 |
-| CWE information | llm_prompt_generator.py | 12-19 |
-| Sink hints | llm_prompt_generator.py | 22-28 |
-| Dataset path | vulnerability_detector.py | 19-20 |
-| CWE mapping | vulnerability_detector.py | 22-29 |
-| Prompt budget | vulnerability_detector.py | 48 |
-| Compression toggle | vulnerability_detector.py | 46 |
-| Joern path | joern_http_client.py | 12-13 |
-| Joern CWE mapping | joern_http_client.py | 15-22 |
+| Configuration item | Location |
+|-------------------|----------|
+| API base URL | `LLM_API_BASE_URL` environment variable |
+| API key | `LLM_API_KEY` environment variable |
+| Model aliases and request defaults | `llm_client.py` |
+| CWE guidance and sink hints | `llm_prompt_generator.py` |
+| Dataset paths | `CSE713_JULIET_BASE`, `CSE713_REPRESENTATIONS_BASE` |
+| Project root fallback | `CSE713_ROOT` |
+| Java fallback | `JOERN_JAVA_HOME` |
 
 ---
 
@@ -496,7 +460,7 @@ Forces LLM to output JSON: response_format = {"type": "json_object"}
 
 If you have questions:
 1. Check the troubleshooting section in this document
-2. Check COMPLETE_PIPELINE_GUIDE.md for detailed pipeline explanation
+2. Check `README.md` for installation, runtime configuration, and the standard pipeline
 3. Check README.md for project overview
 
 ---

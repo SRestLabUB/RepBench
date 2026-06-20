@@ -10,11 +10,26 @@ import json
 import time
 import os
 import re
+import signal
 import argparse
 from pathlib import Path
 
-JULIET_BASE = '/home/tangjiaoshou/CSE713/juliet-test-suite-for-c-cplusplus-v1-3'
-OUTPUT_BASE = '/home/tangjiaoshou/CSE713/juliet_representations_real'
+from project_paths import PROJECT_ROOT
+
+
+ROOT = PROJECT_ROOT
+JULIET_BASE = str(Path(os.environ.get(
+    'CSE713_JULIET_BASE',
+    str(ROOT / 'Joern_llm_implement' / 'juliet-test-suite-for-c-cplusplus-v1-3'),
+)).expanduser().resolve())
+OUTPUT_BASE = str(Path(os.environ.get(
+    'CSE713_REPRESENTATIONS_BASE',
+    str(ROOT / 'Joern_llm_implement' / 'juliet_representations_real'),
+)).expanduser().resolve())
+JAVA_HOME_CANDIDATES = [
+    Path('/usr/lib/jvm/java-17-openjdk-amd64'),
+    Path('/usr/lib/jvm/java-21-openjdk-amd64'),
+]
 
 CWE_DIR_MAP = {
     'CWE-121': 'CWE121_Stack_Based_Buffer_Overflow',
@@ -38,16 +53,40 @@ class JoernServer:
     def start(self):
         """Start Joern server in background"""
         print("Starting Joern server...")
+        env = os.environ.copy()
+        configured_java_home = env.get('JOERN_JAVA_HOME')
+        java_home = (
+            Path(configured_java_home).expanduser().resolve()
+            if configured_java_home
+            else next((path for path in JAVA_HOME_CANDIDATES if path.exists()), None)
+        )
+        if java_home and java_home.exists():
+            env['JAVA_HOME'] = str(java_home)
+            env['PATH'] = os.pathsep.join(
+                (str(java_home / 'bin'), env.get('PATH', ''))
+            )
+        process_options = {}
+        if os.name == 'posix':
+            process_options['start_new_session'] = True
+        elif hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+            process_options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+
         self.process = subprocess.Popen(
             ['joern', '--server'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            env=env,
+            **process_options,
         )
         
         # Wait for server to be ready
         max_wait = 30
         for i in range(max_wait):
+            if self.process.poll() is not None:
+                stderr = self.process.stderr.read() if self.process.stderr else ''
+                print(f"❌ Joern server exited early: {stderr[:500]}")
+                return False
             try:
                 response = requests.get(f'{self.url}/query-sync', timeout=1)
                 print(f"✅ Joern server ready (took {i+1}s)")
@@ -58,20 +97,46 @@ class JoernServer:
         print(f"❌ Joern server not ready after {max_wait}s")
         return False
     
+    def _signal_process(self, force=False):
+        """Signal the Joern process tree where supported."""
+        if os.name == 'posix':
+            try:
+                process_group = os.getpgid(self.process.pid)
+                os.killpg(
+                    process_group, signal.SIGKILL if force else signal.SIGTERM
+                )
+                return
+            except ProcessLookupError:
+                return
+            except OSError:
+                # Fall back when process-group operations are unavailable.
+                pass
+        try:
+            self.process.kill() if force else self.process.terminate()
+        except ProcessLookupError:
+            pass
+
     def stop(self):
-        """Stop Joern server"""
-        if self.process:
-            self.process.terminate()
+        """Stop Joern server."""
+        if not self.process:
+            return
+        self._signal_process()
+        try:
             self.process.wait(timeout=5)
-            print("Joern server stopped")
+        except subprocess.TimeoutExpired:
+            self._signal_process(force=True)
+            self.process.wait(timeout=5)
+        finally:
+            self.process = None
+        print("Joern server stopped")
     
-    def query(self, query: str) -> dict:
+    def query(self, query: str, timeout: float = 120) -> dict:
         """Execute a query on Joern server"""
         try:
             response = requests.post(
                 f'{self.url}/query-sync',
                 json={'query': query},
-                timeout=120
+                timeout=timeout
             )
             result = response.json()
             return {

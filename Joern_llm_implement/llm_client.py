@@ -5,6 +5,7 @@ Calls the LLM API with generated prompts and parses responses
 """
 
 import json
+import os
 import uuid
 import random
 import time
@@ -13,8 +14,11 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 # LLM API Configuration
-API_BASE_URL = "https://dashscope-us.aliyuncs.com/compatible-mode/v1" # https://dashscope.aliyuncs.com/compatible-mode/v1 for Aliyun CN
-API_KEY = "YOUR_API_KEY_HERE"
+API_BASE_URL = os.environ.get(
+    "LLM_API_BASE_URL",
+    "https://dashscope-us.aliyuncs.com/compatible-mode/v1",
+)
+API_KEY = os.environ.get("LLM_API_KEY")
 
 # Available models
 MODELS = {
@@ -41,11 +45,16 @@ class LLMResponse:
 class LLMClient:
     """Client for calling LLM API for vulnerability detection"""
     
-    def __init__(self, model: str = "qwen", api_key: str = API_KEY):
-        self.api_key = api_key
+    def __init__(
+        self,
+        model: str = "qwen",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+    ):
+        self.api_key = api_key or API_KEY
         self.model = MODELS.get(model, model)
-        self.base_url = API_BASE_URL
-        self.endpoint = f"{self.base_url}/v1/chat/completions"
+        self.base_url = (base_url or API_BASE_URL).rstrip("/")
+        self.endpoint = f"{self.base_url}/chat/completions"
     
     def call(
         self,
@@ -59,6 +68,8 @@ class LLMClient:
         total_timeout: Optional[float] = 180,
     ) -> LLMResponse:
         """Call LLM API with the given prompt"""
+        if not self.api_key:
+            raise ValueError("Missing API key. Set LLM_API_KEY or pass api_key explicitly.")
         
         if system_prompt is None:
             system_prompt = """You are a senior C/C++ developer performing code review.

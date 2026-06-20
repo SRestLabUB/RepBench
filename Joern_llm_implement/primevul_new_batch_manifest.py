@@ -7,7 +7,10 @@ from pathlib import Path
 from typing import Iterable
 
 
-ROOT = Path('/home/tangjiaoshou/CSE713')
+from project_paths import PROJECT_ROOT
+
+
+ROOT = PROJECT_ROOT
 DEFAULT_TESTCASE_ROOT = ROOT / 'primevul_testcases_output_clean'
 DEFAULT_OUTPUT_DIR = ROOT / 'primevul_new_batch_results'
 DEFAULT_EXISTING_RESULT_FILES = [
