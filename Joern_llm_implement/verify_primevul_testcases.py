@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 
-ROOT = Path('/home/tangjiaoshou/CSE713')
+from project_paths import PROJECT_ROOT
+
+
+ROOT = PROJECT_ROOT
 DEFAULT_TESTCASE_ROOT = ROOT / 'primevul_testcases_output_clean'
 DEFAULT_PRIMEVUL_DATA = ROOT / 'Joern_llm_implement' / 'primevul_data'
 DEFAULT_OUTPUT = ROOT / 'Joern_llm_implement' / 'primevul_testcase_verification.jsonl'

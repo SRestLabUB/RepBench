@@ -28,7 +28,10 @@ from primevul_representation_experiment import (
 )
 
 
-ROOT = Path('/home/tangjiaoshou/CSE713')
+from project_paths import PROJECT_ROOT
+
+
+ROOT = PROJECT_ROOT
 DEFAULT_TEST_ROOT = ROOT / 'Joern_llm_implement' / 'test'
 DEFAULT_TESTCASE_ROOT = ROOT / 'primevul_testcases_output_clean'
 DEFAULT_OUTPUT_DIR = ROOT / 'primevul_epdg_comparison_expanded'

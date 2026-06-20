@@ -2,3 +2,8 @@ data/
 vendor/
 .env
 primevul_data/
+
+# Python and local generated outputs
+__pycache__/
+generated_prompt.txt
+detection_result.json

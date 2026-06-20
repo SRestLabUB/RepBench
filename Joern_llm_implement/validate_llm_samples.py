@@ -6,14 +6,16 @@ from dataclasses import asdict
 from pathlib import Path
 
 from llm_client import LLMClient
+from project_paths import PROJECT_ROOT
 from vulnerability_detector import VulnerabilityDetector
 
 
 CWES = ["CWE-121", "CWE-122", "CWE-191", "CWE-415", "CWE-416"]
+REPRESENTATIONS_ROOT = PROJECT_ROOT / "Joern_llm_implement" / "juliet_representations_real"
 
 
 def sample_files(cwe_id: str, limit: int) -> list[str]:
-    ast_dir = Path("juliet_representations_real") / cwe_id.replace("-", "_") / "ast"
+    ast_dir = REPRESENTATIONS_ROOT / cwe_id.replace("-", "_") / "ast"
     return sorted(p.name.replace(".ast.dot", ".c") for p in ast_dir.glob("*.ast.dot"))[:limit]
 
 
