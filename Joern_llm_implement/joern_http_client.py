@@ -55,17 +55,29 @@ class JoernServer:
         print("Starting Joern server...")
         env = os.environ.copy()
         configured_java_home = env.get('JOERN_JAVA_HOME')
-        java_home = Path(configured_java_home) if configured_java_home else next((path for path in JAVA_HOME_CANDIDATES if path.exists()), None)
+        java_home = (
+            Path(configured_java_home).expanduser().resolve()
+            if configured_java_home
+            else next((path for path in JAVA_HOME_CANDIDATES if path.exists()), None)
+        )
         if java_home and java_home.exists():
             env['JAVA_HOME'] = str(java_home)
-            env['PATH'] = f'{java_home / "bin"}:{env.get("PATH", "")}'
+            env['PATH'] = os.pathsep.join(
+                (str(java_home / 'bin'), env.get('PATH', ''))
+            )
+        process_options = {}
+        if os.name == 'posix':
+            process_options['start_new_session'] = True
+        elif hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+            process_options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+
         self.process = subprocess.Popen(
             ['joern', '--server'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             env=env,
-            start_new_session=True,
+            **process_options,
         )
         
         # Wait for server to be ready
@@ -85,19 +97,38 @@ class JoernServer:
         print(f"❌ Joern server not ready after {max_wait}s")
         return False
     
-    def stop(self):
-        """Stop Joern server"""
-        if self.process:
+    def _signal_process(self, force=False):
+        """Signal the Joern process tree where supported."""
+        if os.name == 'posix':
             try:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                process_group = os.getpgid(self.process.pid)
+                os.killpg(
+                    process_group, signal.SIGKILL if force else signal.SIGTERM
+                )
+                return
             except ProcessLookupError:
                 return
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
-                self.process.wait(timeout=5)
-            print("Joern server stopped")
+            except OSError:
+                # Fall back when process-group operations are unavailable.
+                pass
+        try:
+            self.process.kill() if force else self.process.terminate()
+        except ProcessLookupError:
+            pass
+
+    def stop(self):
+        """Stop Joern server."""
+        if not self.process:
+            return
+        self._signal_process()
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._signal_process(force=True)
+            self.process.wait(timeout=5)
+        finally:
+            self.process = None
+        print("Joern server stopped")
     
     def query(self, query: str, timeout: float = 120) -> dict:
         """Execute a query on Joern server"""
