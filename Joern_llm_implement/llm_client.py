@@ -52,8 +52,6 @@ class LLMClient:
         base_url: Optional[str] = None,
     ):
         self.api_key = api_key or API_KEY
-        if not self.api_key:
-            raise ValueError("Missing API key. Set LLM_API_KEY or pass api_key explicitly.")
         self.model = MODELS.get(model, model)
         self.base_url = (base_url or API_BASE_URL).rstrip("/")
         self.endpoint = f"{self.base_url}/chat/completions"
@@ -70,6 +68,8 @@ class LLMClient:
         total_timeout: Optional[float] = 180,
     ) -> LLMResponse:
         """Call LLM API with the given prompt"""
+        if not self.api_key:
+            raise ValueError("Missing API key. Set LLM_API_KEY or pass api_key explicitly.")
         
         if system_prompt is None:
             system_prompt = """You are a senior C/C++ developer performing code review.

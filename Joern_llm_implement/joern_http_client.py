@@ -18,14 +18,14 @@ from project_paths import PROJECT_ROOT
 
 
 ROOT = PROJECT_ROOT
-JULIET_BASE = os.environ.get(
+JULIET_BASE = str(Path(os.environ.get(
     'CSE713_JULIET_BASE',
     str(ROOT / 'Joern_llm_implement' / 'juliet-test-suite-for-c-cplusplus-v1-3'),
-)
-OUTPUT_BASE = os.environ.get(
+)).expanduser().resolve())
+OUTPUT_BASE = str(Path(os.environ.get(
     'CSE713_REPRESENTATIONS_BASE',
     str(ROOT / 'Joern_llm_implement' / 'juliet_representations_real'),
-)
+)).expanduser().resolve())
 JAVA_HOME_CANDIDATES = [
     Path('/usr/lib/jvm/java-17-openjdk-amd64'),
     Path('/usr/lib/jvm/java-21-openjdk-amd64'),

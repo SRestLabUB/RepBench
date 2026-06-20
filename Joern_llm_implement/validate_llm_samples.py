@@ -2,6 +2,7 @@
 """Run a small end-to-end validation on generated Juliet representations."""
 
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 
@@ -11,7 +12,10 @@ from vulnerability_detector import VulnerabilityDetector
 
 
 CWES = ["CWE-121", "CWE-122", "CWE-191", "CWE-415", "CWE-416"]
-REPRESENTATIONS_ROOT = PROJECT_ROOT / "Joern_llm_implement" / "juliet_representations_real"
+REPRESENTATIONS_ROOT = Path(os.environ.get(
+    "CSE713_REPRESENTATIONS_BASE",
+    str(PROJECT_ROOT / "Joern_llm_implement" / "juliet_representations_real"),
+)).expanduser().resolve()
 
 
 def sample_files(cwe_id: str, limit: int) -> list[str]:
