@@ -120,7 +120,7 @@ def curated_vs_avgpromptchars(results):
     ax.spines["right"].set_visible(False)
 
     ax.legend(
-        title="Method",
+        title="Prompt Family",
         frameon=True,
         framealpha=0.9,
         edgecolor="0.8",
