@@ -5,26 +5,68 @@ Plots for paper submission
 
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
+from matplotlib.ticker import PercentFormatter
+import json
+import sys
+import argparse
 
-def curated_vs_avgpromptchars():
+def data_grouped_by(data, group_by):
+    ret = []
+    grouped_data = data[group_by]
 
-    data = {
-        "Source-only": {
-            "names":        ["raw"],
-            "prompt_chars": [34666],
-            "accuracy":     [53.5],
-        },
-        "Graph-only": {
-            "names":        ["ast", "ast_cfg", "ast_pdg", "cfg", "cfg_pdg", "pdg"],
-            "prompt_chars": [17705, 21761, 22280, 10664, 17403, 11336],
-            "accuracy":     [72.1, 80.4, 83.2, 68.0, 73.8, 69.0],
-        },
-        "Source-plus-Graph": {
-            "names":        ["ast_plus_source", "full", "pdg_plus_source"],
-            "prompt_chars": [40579, 42900, 38951],
-            "accuracy":     [69.3, 73.5, 65.7],
-        },
-    }
+    if not grouped_data:
+        print("Data group by not found.", file=sys.stderr)
+        sys.exit(1)
+
+    for key, val in grouped_data.items():
+        ret.append({key : val})
+
+    return ret
+
+def determine_prompt_family(variant):
+    if variant == "raw":
+        return "Source-only"
+    if variant in ["ast", "ast_cfg", "ast_pdg", "cfg", "cfg_pdg", "pdg"]:
+        return "Graph-only"
+    if variant in ["ast_plus_source", "full", "pdg_plus_source"]:
+        return "Source-plus-Graph"
+    return variant
+
+def raw_curated_vs_metric(results, metric, sig_figs):
+    ret = {}
+    for res in results:
+        for key, val in res.items():
+            prompt_fam = determine_prompt_family(key)
+            prompt_avg_chars = round(val[metric], sig_figs)
+            prompt_cur_acc = round(val['curated_accuracy'] * 100, 1)
+            if prompt_fam in ret:
+                ret[prompt_fam]["names"].append(key)
+                ret[prompt_fam][metric].append(prompt_avg_chars)
+                ret[prompt_fam]["accuracy"].append(prompt_cur_acc)
+            else:
+                ret[prompt_fam] = {
+                    "names": [key],
+                    metric: [prompt_avg_chars],
+                    "accuracy": [prompt_cur_acc]
+                }
+
+    return ret
+
+def aggregate_curated_by_category(results):
+    categories = []
+    vals = []
+    for res in results:
+        for key, val in res.items():
+            categories.append(key)
+            vals.append(round(val['curated_accuracy'] * 100, 2))
+
+    return categories, vals
+
+
+
+def curated_vs_avgpromptchars(results):
+
+    data = raw_curated_vs_metric(results, 'avg_prompt_chars', 0)
 
     STYLE = {
         "Source-only":       {"color": "#0072B2", "marker": "o"},  # blue
@@ -55,7 +97,7 @@ def curated_vs_avgpromptchars():
     for label, vals in data.items():
         s = STYLE[label]
         ax.scatter(
-            vals["prompt_chars"],
+            vals["avg_prompt_chars"],
             vals["accuracy"],
             label=label,
             color=s["color"],
@@ -89,8 +131,72 @@ def curated_vs_avgpromptchars():
     fig.savefig("variant_curated_accuracy_vs_prompt_chars.pdf", bbox_inches="tight")
 
 
+def curated_vs_cwe(results):
+    categories, accuracy = aggregate_curated_by_category(results)
+
+    BAR_COLOR = "#0072B2"
+
+    # Figure size (inches): ~3.5 = single column, ~7.0 = double column.
+    FIG_WIDTH  = 7.0
+    FIG_HEIGHT = 4.3
+
+    rcParams.update({
+        "font.family":     "serif",
+        "font.size":       11,
+        "axes.labelsize":  12,
+        "axes.titlesize":  13,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "axes.linewidth":  0.8,
+        "savefig.dpi":     300,
+        "figure.dpi":      150,
+        "mathtext.fontset": "cm",
+    })
+
+    cats, accs = list(categories), list(accuracy)
+    # ascending: for horizontal, largest ends up on top; for vertical, on the right.
+    order = sorted(range(len(accs)), key=lambda i: accs[i])
+    cats = [cats[i] for i in order]
+    accs = [accs[i] for i in order]
+
+    headroom = min(1.0, max(accs) * 1.15)
+
+    fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
+
+    bars = ax.barh(
+        cats, accs,
+        color=BAR_COLOR, edgecolor="black", linewidth=0.6, height=0.65, zorder=3,
+    )
+    ax.set_xlabel("Curated Accuracy")
+    ax.set_ylabel("CWE Category")
+    ax.set_xlim(0, headroom)
+    ax.xaxis.set_major_formatter(PercentFormatter(1.0))
+    ax.grid(True, axis="x", linestyle="--", linewidth=0.5, alpha=0.4, zorder=0)
+
+    for bar, val in zip(bars, accs):
+        ax.annotate(
+            val,
+            xy=(val, bar.get_y() + bar.get_height() / 2),
+            xytext=(3, 0), textcoords="offset points",
+            ha="left", va="center", fontsize=9, zorder=4,
+        )
+
+    fig.savefig("aggregate_curated_accuracy_vs_cwe.pdf", bbox_inches="tight")
+
+
 def main():
-    curated_vs_avgpromptchars()
+    parser = argparse.ArgumentParser(description='Generate plots for paper.')
+
+    parser.add_argument('-r', '--results', help='Test results JSON file.')
+    args = parser.parse_args()
+
+    with open(args.results, 'r') as f:
+        data = json.load(f)
+
+    data_by_variant = data_grouped_by(data, 'by_variant')
+    data_by_cwe = data_grouped_by(data, 'by_cwe_rows')
+    curated_vs_avgpromptchars(data_by_variant)
+    curated_vs_cwe(data_by_cwe)
 
 if __name__ == "__main__":
     main()
