@@ -3,7 +3,6 @@
 
 import json
 import os
-from dataclasses import asdict
 from pathlib import Path
 
 from llm_client import LLMClient
