@@ -114,6 +114,7 @@ def curated_vs_avgpromptchars(results):
     ax.set_title("Curated Accuracy vs Average Prompt Chars")
 
     # Light dashed grid + clean spines
+    ax.yaxis.set_major_formatter(PercentFormatter(100.0))
     ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.4, zorder=0)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -159,7 +160,7 @@ def curated_vs_cwe(results):
     cats = [cats[i] for i in order]
     accs = [accs[i] for i in order]
 
-    headroom = min(1.0, max(accs) * 1.15)
+    headroom = min(100.0, max(accs) * 1.15)
 
     fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
 
@@ -170,16 +171,8 @@ def curated_vs_cwe(results):
     ax.set_xlabel("Curated Accuracy")
     ax.set_ylabel("CWE Category")
     ax.set_xlim(0, headroom)
-    ax.xaxis.set_major_formatter(PercentFormatter(1.0))
+    ax.xaxis.set_major_formatter(PercentFormatter(100.0))
     ax.grid(True, axis="x", linestyle="--", linewidth=0.5, alpha=0.4, zorder=0)
-
-    for bar, val in zip(bars, accs):
-        ax.annotate(
-            val,
-            xy=(val, bar.get_y() + bar.get_height() / 2),
-            xytext=(3, 0), textcoords="offset points",
-            ha="left", va="center", fontsize=9, zorder=4,
-        )
 
     fig.savefig("aggregate_curated_accuracy_vs_cwe.pdf", bbox_inches="tight")
 
