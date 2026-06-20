@@ -122,7 +122,7 @@ def curated_vs_avgpromptchars(results):
         expand=(1.5,1.3)
     )
 
-    ax.set_xlabel("Average Prompt Characters")
+    ax.set_xlabel("Average Number of Characters in Prompt")
     ax.set_ylabel("Curated Accuracy")
     ax.set_title("Curated Accuracy vs Average Prompt Chars")
 
