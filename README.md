@@ -1,15 +1,4 @@
-# CSE713_as_jt_vulnerability_analysis
-CSE 713 Group Project
-# Team Formation
-**Team name:** CSE713_as_jt_vulnerability_analysis\
-**Project Topic:** Empirical study of the efficacy of software analysis techniques used to represent vulnerability semantics and program characteristics in a large language model based automated program repair system on some well known vulnerabilities.\
-**Project Repository:** https://github.com/aestoltm/CSE713_as_jt_vulnerability_analysis \
-**Team Members:**\
-**Name  Email  UB ID  Contact**\
-Andrew Stoltman  aestoltm@buffalo.edu  50342825  ✔\
-Johnathan Tang  junhuata@buffalo.edu  50400890
-
-
+# Representation Matters: An Empirical Study of Static-Analysis-Based Code Representations for LLM Vulnerability Reasoning
 
 # Problem Statement
 Automatic vulnerability detection has seen many developments over the past decade with static application testing, deep learning systems, and most recently with the prevalence of large language models (LLMs) within automated program repair (APR) systems. A common challenge among all approaches is representing vulnerability semantics and program characteristics (e.g. control-flow diagram, data-flow diagram, etc) without a domain expert intervening. Even with expert-level human intervention there are many difficulties. We aim to analyze and perform empirical testing of various program analysis approaches through the prompting of a LLM-based APR system in order to evaluate the efficacy of the various software analysis approaches within APR on a few well known vulnerabilities (code samples provided through CWEs test suite).
