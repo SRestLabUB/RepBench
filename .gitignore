@@ -7,3 +7,4 @@ primevul_data/
 __pycache__/
 generated_prompt.txt
 detection_result.json
+primevul_paper_results_latest/token_count_run/

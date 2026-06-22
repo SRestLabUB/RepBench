@@ -17,7 +17,7 @@ Requirement: Python 3.10+ (Python 3.11 recommended)
 python3 --version
 
 # Install Python dependencies
-python -m pip install -r requirements.txt
+python -m pip install -r ../requirements.txt
 ```
 
 ### 2. Joern Installation
@@ -348,7 +348,7 @@ python3 validate_llm_samples.py --max-prompt-chars 8000
 Step 1: Prepare the environment
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r ../requirements.txt
 export PATH=$HOME/joern:$PATH
 export LLM_API_KEY="your-key"
 export LLM_API_BASE_URL="https://provider.example/v1"

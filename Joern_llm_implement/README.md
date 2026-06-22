@@ -82,7 +82,7 @@ Initial shapelib CWE-415 comparison result:
 ### 1. Install Dependencies
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install -r ../requirements.txt
 ```
 
 ### 2. Configure Runtime Settings
@@ -153,9 +153,10 @@ Joern_llm_implement/
 ├── demo_llm_pipeline.py       # Single file demo
 │
 ├── README.md                  # This file
-├── SETUP_FOR_OTHER_DATASET.md # Guide for other datasets
-└── requirements.txt           # Python dependencies
+└── SETUP_FOR_OTHER_DATASET.md # Guide for other datasets
 ```
+
+Project-wide Python dependencies are listed in `../requirements.txt`.
 
 ## Key Features
 

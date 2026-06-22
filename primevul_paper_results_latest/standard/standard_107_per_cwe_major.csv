@@ -1,0 +1,6 @@
+cwe,testcase_count,low_support,raw_curated_accuracy,ast_pdg_curated_accuracy,graph_only_curated_accuracy,source_plus_graph_curated_accuracy
+CWE-122,4,true,50.0,100.0,83.3,58.3
+CWE-190,56,false,53.8,84.6,77.8,65.8
+CWE-191,2,true,100.0,100.0,83.3,50.0
+CWE-415,23,false,50.0,72.7,64.6,76.2
+CWE-416,22,false,52.4,85.7,73.3,75.4
