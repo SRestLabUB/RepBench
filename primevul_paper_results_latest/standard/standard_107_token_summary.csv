@@ -1,0 +1,14 @@
+scope,name,prompt_count,avg_input_tokens,exact_count,proxy_reconstructed_count
+family,source-only,107,10767.4,101,6
+family,graph-only,642,5973.4,540,102
+family,source-plus-graph,319,12938.2,277,42
+variant,ast,107,6252.1,88,19
+variant,ast_cfg,107,7595.6,89,18
+variant,ast_pdg,107,7980.2,89,18
+variant,ast_plus_source,106,12883.0,94,12
+variant,cfg,107,3670.1,94,13
+variant,cfg_pdg,107,6204.6,90,17
+variant,full,106,13720.5,90,16
+variant,pdg,107,4137.7,90,17
+variant,pdg_plus_source,107,12218.1,93,14
+variant,raw,107,10767.4,101,6
