@@ -9,6 +9,8 @@ This folder contains only the latest result artifacts used in the paper.
   - Built from the retained historical 25-case standard set plus the completed 82-case new batch.
 - `standard/standard_107_summary.json`
   - Corpus counts and evaluation summaries for the full 107-case standard track.
+- `standard/standard_107_breakdowns.json`
+  - Different groupings parsed from the full standard joren-track results.
 - `standard/standard_107_token_counts.jsonl`
   - Per-prompt input-token counts returned by the evaluated `qwen3.6-plus` service.
   - Includes reconstructed prompt length/hash and an `exact` or `proxy_reconstructed` audit status.
@@ -22,6 +24,11 @@ This folder contains only the latest result artifacts used in the paper.
   - The 11-case overlapping subset used for direct paired comparison references.
 - `epdg/epdg_19_summary.json`
   - Summary statistics for the 19-case ePDG track and the overlapping 11-case subset.
+
+## Visualizations
+
+- `visualizations/`
+  - Visualizations provided to arXiv paper submission.
 
 ## Intentionally Excluded
 
