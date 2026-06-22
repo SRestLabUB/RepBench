@@ -173,113 +173,154 @@ def curated_vs_cwe(results):
     print("Wrote: ", f"{outdir}/aggregate_curated_accuracy_vs_cwe.pdf")
 
 
-def curated_vs_multi_cat(results, cat, field, special_field = False):
-    mult_cat_res = aggregate_curated_by_multi_category(results, cat, field)
+def _cwe_support(results):
+    """Return testcase support per CWE from grouped variant/family rows."""
+    # Source-only contains exactly one variant (raw), so its row count is the
+    # testcase count rather than a pooled prompt-row count.
+    source_only = {
+        row["cwe"]: row["count"]
+        for row in results
+        if row.get("prompt_family") == "source_only"
+    }
+    if source_only:
+        return source_only
 
-    categories = mult_cat_res.keys()
-    values = {}
+    support = {}
+    for row in results:
+        support[row["cwe"]] = max(support.get(row["cwe"], 0), row["count"])
+    return support
 
-    for outer, res in mult_cat_res.items():
-        for key, val in res.items():
-            if key not in values:
-                values[key] = [val]
-            else:
-                values[key].append(val)
 
-    # Hard coded 'special' field to add data outside of chosen 'field'
-    # but still can be compared. Used to highlight 'AST + PDG' results
-    if special_field:
-        special_res = aggregate_curated_by_multi_category(data_grouped_by(breakdowns, 'cwe__variant'), 'cwe', 'variant')
-        special_vals = []
-        for cwe, cwe_val in special_res.items():
-            for variant, val in cwe_val.items():
-                if variant == 'ast_pdg':
-                    special_vals.append(val)
+def _cwe_tick_label(cwe, support):
+    marker = r"$^\dagger$" if support[cwe] < 5 else ""
+    return f"{cwe}{marker}\n(n={support[cwe]})"
 
-        values['ast_pdg'] = special_vals
 
-    COLORS = [
-        "#0072B2",  # blue
-        "#E69F00",  # orange
-        "#009E73",  # bluish green
-        "#D55E00",  # vermillion
-        "#CC79A7",  # reddish purple
-        "#56B4E9",  # sky blue
-        "#F0E442",  # yellow
-        "#000000",  # black
+def curated_vs_cwe_by_variant(results):
+    """Render the dense CWE-by-variant breakdown as an annotated heatmap."""
+    cwes = sorted({row["cwe"] for row in results})
+    support = _cwe_support(results)
+    variant_order = [
+        "raw",
+        "ast", "cfg", "pdg", "ast_cfg", "ast_pdg", "cfg_pdg",
+        "ast_plus_source", "pdg_plus_source", "full",
+    ]
+    labels = {
+        "raw": "Raw source",
+        "ast": "AST",
+        "cfg": "CFG",
+        "pdg": "PDG",
+        "ast_cfg": "AST+CFG",
+        "ast_pdg": "AST+PDG",
+        "cfg_pdg": "CFG+PDG",
+        "ast_plus_source": "AST+Source",
+        "pdg_plus_source": "PDG+Source",
+        "full": "Source+AST+CFG+PDG",
+    }
+    lookup = {
+        (row["variant"], row["cwe"]): row["curated_accuracy"] * 100
+        for row in results
+    }
+    matrix = [
+        [lookup.get((variant, cwe), float("nan")) for cwe in cwes]
+        for variant in variant_order
     ]
 
-    MARKERS = ["o", "s", "^", "D", "v", "P", "X", "*", "<", ">"]
-    STYLE = {}
-    groups = list(values.keys())
+    fig, ax = plt.subplots(figsize=(7.0, 5.8))
+    image = ax.imshow(matrix, cmap="YlGnBu", vmin=0, vmax=100, aspect="auto")
 
-    for key, val in enumerate(groups):
-        STYLE[val] = {"color": COLORS[key % len(COLORS)], "marker": MARKERS[key % len(MARKERS)]}
+    for row_index, row in enumerate(matrix):
+        for col_index, value in enumerate(row):
+            if value != value:
+                text, color = "--", "black"
+            else:
+                text = f"{value:.1f}"
+                color = "white" if value >= 68 else "black"
+            ax.text(col_index, row_index, text, ha="center", va="center",
+                    fontsize=8.5, color=color)
 
-    # Set up plot bands to space out categories
-    groups = list(values.keys())
-    band_width = 0.45
-    G = len(groups)
-    step = band_width / (G - 1) if G > 1 else 0
-    offsets = [-band_width / 2 + i * step for i in range(G)]
+    ax.set_xticks(range(len(cwes)))
+    ax.set_xticklabels([_cwe_tick_label(cwe, support) for cwe in cwes])
+    ax.set_yticks(range(len(variant_order)))
+    ax.set_yticklabels([labels[variant] for variant in variant_order])
+    ax.set_xlabel("CWE Category")
+    ax.set_ylabel("Representation Variant")
+    ax.set_title("Curated Accuracy by CWE and Representation Variant")
 
-    # Figure size (inches): ~3.5 = single column, ~7.0 = double column.
-    FIG_WIDTH  = 7.0
-    FIG_HEIGHT = 4.3
+    # Separate source-only, graph-only, and source-plus-graph rows.
+    ax.axhline(0.5, color="white", linewidth=2.0)
+    ax.axhline(6.5, color="white", linewidth=2.0)
+    colorbar = fig.colorbar(image, ax=ax, pad=0.02)
+    colorbar.set_label("Curated Accuracy (%)")
+    fig.text(0.5, 0.015, r"$^\dagger$ Low support ($n<5$); interpret descriptively.",
+             ha="center", fontsize=9)
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
 
-    fig, ax = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
+    output = f"{outdir}/curated_accuracy_vs_CWE_by_Variant.pdf"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    print("Wrote: ", output)
 
-    # shaded category lanes (subtle for print) + boundary lines
-    for c in range(len(categories)):
-        if c % 2 == 0:
-            ax.axvspan(c - 0.5, c + 0.5, color="0.95", zorder=0)
-        if c > 0:
-            ax.axvline(c - 0.5, color="0.85", lw=0.6, zorder=0)
 
-    # one scatter call per group -> automatic legend
-    for gi, group in enumerate(groups):
-        s = STYLE[group]
-        xs = [c + offsets[gi] for c in range(len(categories))]
-        ys = values[group]
-        ax.scatter(
-            xs, ys,
-            label=group,
-            color=s["color"],
-            marker=s["marker"],
-            s=55,
-            edgecolors="black",
-            linewidths=0.5,
-            alpha=0.9,
-            zorder=3,
+def curated_vs_cwe_by_prompt_family(results):
+    """Render the three prompt families as an easy-to-compare grouped bar chart."""
+    cwes = sorted({row["cwe"] for row in results})
+    support = _cwe_support(results)
+    families = ["source_only", "graph_only", "source_plus_graph"]
+    labels = {
+        "source_only": "Source-only",
+        "graph_only": "Graph-only",
+        "source_plus_graph": "Source+Graph",
+    }
+    colors = {
+        "source_only": "#0072B2",
+        "graph_only": "#E69F00",
+        "source_plus_graph": "#009E73",
+    }
+    lookup = {
+        (row["prompt_family"], row["cwe"]): row["curated_accuracy"] * 100
+        for row in results
+    }
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.8))
+    width = 0.24
+    centers = list(range(len(cwes)))
+    for family_index, family in enumerate(families):
+        offset = (family_index - 1) * width
+        values = [lookup.get((family, cwe), 0.0) for cwe in cwes]
+        bars = ax.bar(
+            [center + offset for center in centers],
+            values,
+            width,
+            label=labels[family],
+            color=colors[family],
+            edgecolor="black",
+            linewidth=0.5,
         )
+        ax.bar_label(bars, fmt="%.1f", fontsize=8, padding=2)
 
-    cat_label = 'CWE' if cat == 'cwe' else cat.title()
-    group_by_label = " ".join(field.split("_")).title()
-
-    ax.set_xticks(range(len(categories)))
-    ax.set_xticklabels(categories)
-    ax.set_xlim(-0.5, len(categories) - 0.5)
+    ax.set_xticks(centers)
+    ax.set_xticklabels([_cwe_tick_label(cwe, support) for cwe in cwes])
+    ax.set_ylim(0, 110)
+    ax.set_xlabel("CWE Category")
     ax.set_ylabel("Curated Accuracy")
-    ax.set_title(f"Curated Accuracy vs {cat_label}: by {group_by_label}")
-
-    ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.4, zorder=0)
+    ax.yaxis.set_major_formatter(PercentFormatter(100.0))
+    fig.suptitle("Curated Accuracy by CWE and Prompt Family", y=0.98)
+    ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.4)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    handles, legend_labels = ax.get_legend_handles_labels()
+    fig.legend(handles, legend_labels, title="Prompt Family", ncol=3,
+               loc="upper center", bbox_to_anchor=(0.5, 0.91))
+    fig.text(0.5, 0.015, r"$^\dagger$ Low support ($n<5$); interpret descriptively.",
+             ha="center", fontsize=9)
+    fig.tight_layout(rect=(0, 0.04, 1, 0.80))
 
-    ax.legend(
-        title=group_by_label,
-        frameon=True,
-        framealpha=0.9,
-        edgecolor="0.8",
-        bbox_to_anchor=(1.01, 1),
-        loc="upper left",
-    )
-
-    fig.tight_layout()
-
-    fig.savefig(f"{outdir}/curated_accuracy_vs_{cat_label}_by_{group_by_label}.pdf", bbox_inches="tight")
-    print("Wrote: ", f"{outdir}/curated_accuracy_vs_{cat_label}_by_{group_by_label}.pdf")
+    output = f"{outdir}/curated_accuracy_vs_CWE_by_Prompt Family.pdf"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    print("Wrote: ", output)
 
 def main():
     parser = argparse.ArgumentParser(description='Generate plots for paper.')
@@ -316,8 +357,8 @@ def main():
 
     curated_vs_avgpromptchars(data_grouped_by(breakdowns, 'variant'))
     curated_vs_cwe(data_grouped_by(breakdowns, 'cwe'))
-    curated_vs_multi_cat(data_grouped_by(breakdowns, 'cwe__variant'), 'cwe', 'variant')
-    curated_vs_multi_cat(data_grouped_by(breakdowns, 'cwe__prompt_family'), 'cwe', 'prompt_family', True)
+    curated_vs_cwe_by_variant(data_grouped_by(breakdowns, 'cwe__variant'))
+    curated_vs_cwe_by_prompt_family(data_grouped_by(breakdowns, 'cwe__prompt_family'))
 
 if __name__ == "__main__":
     main()
