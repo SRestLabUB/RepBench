@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from matplotlib.ticker import PercentFormatter
 from collections import defaultdict
+from pathlib import Path
+import csv
 import json
 import sys
 import argparse
@@ -51,6 +53,22 @@ def raw_curated_vs_metric(results, metric, sig_figs):
             }
 
     return ret
+
+def load_variant_token_counts(token_summary_path):
+    """Load average input-token counts keyed by representation variant."""
+    token_summary_path = Path(token_summary_path)
+    if not token_summary_path.exists():
+        return {}
+
+    tokens_by_variant = {}
+    with token_summary_path.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("scope") != "variant":
+                continue
+            tokens_by_variant[row["name"]] = float(row["avg_input_tokens"])
+    return tokens_by_variant
+
 
 def aggregate_curated_by_category(results, cat):
     categories = []
@@ -121,6 +139,8 @@ def curated_vs_avgpromptchars(results):
     ax.set_title("Curated Accuracy vs Average Prompt Chars")
 
     # Light dashed grid + clean spines
+    ax.set_ylim(52, 86)
+    ax.set_yticks([55, 60, 65, 70, 75, 80, 85])
     ax.yaxis.set_major_formatter(PercentFormatter(100.0))
     ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.4, zorder=0)
     ax.spines["top"].set_visible(False)
@@ -138,6 +158,76 @@ def curated_vs_avgpromptchars(results):
 
     fig.savefig(f"{outdir}/variant_curated_accuracy_vs_prompt_chars.pdf", bbox_inches="tight")
     print("Wrote: ", f"{outdir}/variant_curated_accuracy_vs_prompt_chars.pdf")
+
+
+def curated_vs_avgprompttokens(results, tokens_by_variant):
+    if not tokens_by_variant:
+        print("Skipping token plot: no token summary found.", file=sys.stderr)
+        return
+
+    token_results = []
+    for res in results:
+        variant = res["variant"]
+        if variant not in tokens_by_variant:
+            print(f"Skipping token plot: missing token count for {variant}.", file=sys.stderr)
+            return
+        row = dict(res)
+        row["avg_input_tokens"] = tokens_by_variant[variant]
+        token_results.append(row)
+
+    data = raw_curated_vs_metric(token_results, "avg_input_tokens", 0)
+
+    STYLE = {
+        "Source-only":       {"color": "#0072B2", "marker": "o"},  # blue
+        "Graph-only":        {"color": "#E69F00", "marker": "s"},  # orange
+        "Source-plus-Graph": {"color": "#009E73", "marker": "^"},  # green
+    }
+
+    fig, ax = plt.subplots(figsize=(7.0, 4.3))
+    texts = []
+
+    for label, vals in data.items():
+        s = STYLE[label]
+        ax.scatter(
+            vals["avg_input_tokens"],
+            vals["accuracy"],
+            label=label,
+            color=s["color"],
+            marker=s["marker"],
+            s=70,
+            edgecolors="black",
+            linewidths=0.6,
+            alpha=0.9,
+            zorder=3,
+        )
+
+        for name, x, y in zip(vals["names"], vals["avg_input_tokens"], vals["accuracy"]):
+            texts.append(ax.text(x, y, name))
+
+    adjust_text(texts, expand=(1.5, 1.3))
+
+    ax.set_xlabel("Average Number of Input Tokens in Prompt")
+    ax.set_ylabel("Curated Accuracy")
+    ax.set_title("Curated Accuracy vs Average Input Tokens")
+    ax.set_ylim(52, 86)
+    ax.set_yticks([55, 60, 65, 70, 75, 80, 85])
+    ax.yaxis.set_major_formatter(PercentFormatter(100.0))
+    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.4, zorder=0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(
+        title="Prompt Family",
+        frameon=True,
+        framealpha=0.9,
+        edgecolor="0.8",
+        loc="best",
+    )
+    fig.tight_layout()
+
+    output = f"{outdir}/variant_curated_accuracy_vs_prompt_tokens.pdf"
+    fig.savefig(output, bbox_inches="tight")
+    plt.close(fig)
+    print("Wrote: ", output)
 
 
 def curated_vs_cwe(results):
@@ -327,6 +417,10 @@ def main():
 
     parser.add_argument('-r', '--results', help='Test results JSON file.')
     parser.add_argument('-o', '--output', help='Output dir for visualizations.')
+    parser.add_argument(
+        '--token-summary',
+        help='CSV file with variant-level avg_input_tokens. Defaults to standard_107_token_summary.csv next to --results.',
+    )
     args = parser.parse_args()
 
     global outdir
@@ -352,10 +446,17 @@ def main():
     with open(args.results, 'r') as f:
         data = json.load(f)
 
+    token_summary = args.token_summary
+    if token_summary is None:
+        token_summary = Path(args.results).with_name("standard_107_token_summary.csv")
+    tokens_by_variant = load_variant_token_counts(token_summary)
+
     global breakdowns
     breakdowns = data['groupings']
 
-    curated_vs_avgpromptchars(data_grouped_by(breakdowns, 'variant'))
+    variant_results = data_grouped_by(breakdowns, 'variant')
+    curated_vs_avgpromptchars(variant_results)
+    curated_vs_avgprompttokens(variant_results, tokens_by_variant)
     curated_vs_cwe(data_grouped_by(breakdowns, 'cwe'))
     curated_vs_cwe_by_variant(data_grouped_by(breakdowns, 'cwe__variant'))
     curated_vs_cwe_by_prompt_family(data_grouped_by(breakdowns, 'cwe__prompt_family'))
